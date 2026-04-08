@@ -82,6 +82,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  /*
   String _getUpNextMealName(Map<String, dynamic> dayMenu) {
     final now = DateTime.now();
     final currentHour = now.hour + now.minute / 60.0;
@@ -94,76 +95,21 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildHeroSection() {
-    if (_fullMenu == null || _fullMenu![_getCurrentDay()] == null) {
-      return const SizedBox.shrink();
-    }
-    
-    final todayMenu = _fullMenu![_getCurrentDay()];
-    
-    // Case-insensitive mapping 
-    final Map<String, dynamic> cMenu = {};
-    todayMenu.forEach((k, v) => cMenu[k.toLowerCase()] = v);
+    return const SizedBox.shrink();
+  }
+  */
 
-    final nextMealKey = _getUpNextMealName(todayMenu);
+  bool _isMealActive(String meal, String selectedDay) {
+    if (selectedDay != _getCurrentDay()) return false;
+    final now = DateTime.now();
+    final currentHour = now.hour + now.minute / 60.0;
     
-    // Safety check if "Breakfast (Tomorrow)" or etc.
-    String mainItemString = "Not available";
-    if (cMenu.containsKey(nextMealKey.toLowerCase())) {
-        mainItemString = cMenu[nextMealKey.toLowerCase()]['Main'] ?? "Check below";
-    }
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(24.0),
-      margin: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.primaryContainer,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: Theme.of(context).colorScheme.primary.withAlpha(50),
-            blurRadius: 15,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.restaurant_menu, color: Theme.of(context).colorScheme.onPrimaryContainer),
-              const SizedBox(width: 8),
-              Text(
-                'UP NEXT',
-                style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                      color: Theme.of(context).colorScheme.onPrimaryContainer,
-                      letterSpacing: 1.2,
-                      fontWeight: FontWeight.bold,
-                    ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Text(
-            nextMealKey,
-            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.w900,
-                  color: Theme.of(context).colorScheme.onPrimaryContainer,
-                ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            mainItemString,
-            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: Theme.of(context).colorScheme.onPrimaryContainer.withAlpha(200),
-                ),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
-      ),
-    );
+    if (meal == 'breakfast' && currentHour >= 7.5 && currentHour < 10.0) return true;
+    if (meal == 'lunch' && currentHour >= 12.25 && currentHour < 14.75) return true;
+    if (meal == 'snacks' && currentHour >= 17.5 && currentHour < 18.5) return true;
+    if (meal == 'dinner' && currentHour >= 19.5 && currentHour < 21.5) return true;
+    
+    return false;
   }
 
   Widget _buildDaySelector() {
@@ -248,8 +194,8 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Mess Menu', style: TextStyle(fontWeight: FontWeight.w800)),
-        scrolledUnderElevation: 0,
+        title: const Text('IITJ Menu'),
+        centerTitle: false,
       ),
       body: _isLoading
           ? _buildShimmerLoading()
@@ -259,7 +205,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   onRefresh: _fetchMenuFromApi,
                   child: ListView(
                     children: [
-                      _buildHeroSection(),
+                      const SizedBox(height: 8),
+                      // _buildHeroSection(), // Removed huge "UP NEXT" header card based on pure minimalistic layout requirement
                       _buildDaySelector(),
                       const SizedBox(height: 16),
                       AnimatedSwitcher(
@@ -294,17 +241,17 @@ class _HomeScreenState extends State<HomeScreen> {
     };
     
     final colors = {
-      'breakfast': Colors.orangeAccent,
-      'lunch': Colors.purpleAccent,
-      'dinner': Colors.pinkAccent,
-      'snacks': Colors.tealAccent,
+      'breakfast': Theme.of(context).colorScheme.primary,
+      'lunch': Theme.of(context).colorScheme.primary,
+      'dinner': Theme.of(context).colorScheme.primary,
+      'snacks': Theme.of(context).colorScheme.primary,
     };
     
     final times = {
-      'breakfast': '7:30 - 9:30 AM',
-      'lunch': '12:00 - 2:00 PM',
-      'snacks': '5:00 - 6:00 PM',
-      'dinner': '7:30 - 9:30 PM',
+      'breakfast': '7:30 AM - 10:00 AM',
+      'lunch': '12:15 PM - 2:45 PM',
+      'snacks': '5:30 PM - 6:30 PM',
+      'dinner': '7:30 PM - 9:30 PM',
     };
     
     final meals = mealOrder.where((meal) => cMenu.containsKey(meal)).toList();
@@ -322,6 +269,7 @@ class _HomeScreenState extends State<HomeScreen> {
             isLast: idx == meals.length - 1,
             timelineColor: colors[meal] ?? Colors.grey,
             timeRange: times[meal] ?? '',
+            isActive: _isMealActive(meal, _selectedDay),
           );
         }).toList(),
       ),

@@ -42,8 +42,7 @@ void main() async {
   await NotificationService().scheduleDailyMealReminders();
 
   Workmanager().initialize(
-    callbackDispatcher, 
-    isInDebugMode: false,
+    callbackDispatcher,
   );
   
   Workmanager().registerPeriodicTask(
@@ -66,19 +65,51 @@ class MessMenuApp extends StatelessWidget {
       theme: ThemeData(
         useMaterial3: true,
         brightness: Brightness.light,
-        scaffoldBackgroundColor: const Color(0xFFF7F9FC),
+        scaffoldBackgroundColor: const Color(0xFFFAFAFA),
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF6750A4),
+          seedColor: const Color(0xFF1E1E1E), // Neutral premium slate
+          primary: const Color(0xFF1A1A1A),
+          onPrimary: Colors.white,
+          surface: Colors.white,
+          onSurface: const Color(0xFF1E1E1E),
           brightness: Brightness.light,
+        ),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Color(0xFFFAFAFA),
+          elevation: 0,
+          scrolledUnderElevation: 0,
+          iconTheme: IconThemeData(color: Color(0xFF1A1A1A)),
+          titleTextStyle: TextStyle(
+            color: Color(0xFF1A1A1A),
+            fontSize: 22,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -0.5,
+          ),
         ),
       ),
       darkTheme: ThemeData(
         useMaterial3: true,
         brightness: Brightness.dark,
-        scaffoldBackgroundColor: const Color(0xFF111318),
+        scaffoldBackgroundColor: const Color(0xFF000000), // Pure OLED black
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFFD0BCFF),
+          seedColor: Colors.white,
+          primary: Colors.white,
+          onPrimary: Colors.black,
+          surface: const Color(0xFF121212),
+          onSurface: const Color(0xFFEEEEEE),
           brightness: Brightness.dark,
+        ),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Color(0xFF000000),
+          elevation: 0,
+          scrolledUnderElevation: 0,
+          iconTheme: IconThemeData(color: Colors.white),
+          titleTextStyle: TextStyle(
+            color: Colors.white,
+            fontSize: 22,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -0.5,
+          ),
         ),
       ),
       themeMode: ThemeMode.system,
