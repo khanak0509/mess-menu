@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shimmer/shimmer.dart';
 import 'meal_card.dart';
+import 'qr_pass_button.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -196,6 +197,10 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         title: const Text('IITJ Menu'),
         centerTitle: false,
+        actions: const [
+          QRPassButton(),
+          SizedBox(width: 8),
+        ],
       ),
       body: _isLoading
           ? _buildShimmerLoading()
