@@ -1,0 +1,16 @@
+INFO:     Will watch for changes in these directories: ['/Users/khanak/Desktop/mess/backend']
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+INFO:     Started reloader process [52019] using StatReload
+INFO:     Started server process [52061]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+E0000 00:00:1775670270.097366 2278505 alts_credentials.cc:93] ALTS creds ignored. Not running on GCP and untrusted ALTS is not enabled.
+INFO:     127.0.0.1:49910 - "GET /menu/Monday HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49971 - "GET /menu/Monday HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49981 - "GET /menu/Wednesday HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50234 - "GET /menu/Tuesday HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50281 - "GET /menu/Sunday HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50282 - "GET /menu/Thursday HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51126 - "GET /menu HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:51137 - "GET /menu/Monday HTTP/1.1" 200 OK
