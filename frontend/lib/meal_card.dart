@@ -48,11 +48,11 @@ class MealCard extends StatelessWidget {
     
     // Highlight dynamically if meal is active now
     final neutralCardColor = isActive 
-        ? Color.alphaBlend(timelineColor.withAlpha(isDark ? 30 : 20), isDark ? const Color(0xFF1E1E1E) : Colors.white)
+        ? Color.alphaBlend(timelineColor.withAlpha(isDark ? 45 : 30), isDark ? const Color(0xFF1E1E1E) : Colors.white)
         : (isDark ? const Color(0xFF1E1E1E) : Colors.white);
         
     final borderColor = isActive
-        ? timelineColor.withAlpha(isDark ? 150 : 100)
+        ? timelineColor.withAlpha(isDark ? 200 : 150)
         : (isDark ? Colors.white.withAlpha(30) : Colors.black.withAlpha(20));
         
     final shadowColor = isActive
@@ -136,10 +136,11 @@ class MealCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(20),
                   child: Container(
                     decoration: BoxDecoration(
+                      color: isActive ? timelineColor.withAlpha(isDark ? 30 : 25) : null,
                       border: isActive ? Border(
                         left: BorderSide(
-                          color: timelineColor.withAlpha(255),
-                          width: 6.0,
+                          color: timelineColor,
+                          width: 8.0,
                         ),
                       ) : Border(
                         left: BorderSide(
@@ -172,17 +173,26 @@ class MealCard extends StatelessWidget {
                               if (isActive) ...[
                                 const SizedBox(width: 8),
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                   decoration: BoxDecoration(
-                                    color: timelineColor.withAlpha(isDark ? 60 : 40),
+                                    color: timelineColor, // Solid vibrant background
                                     borderRadius: BorderRadius.circular(6),
-                                    border: Border.all(color: timelineColor.withAlpha(120)),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: timelineColor.withAlpha(isDark ? 80 : 120),
+                                        blurRadius: 6,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ],
                                   ),
                                   child: Row(
                                     children: [
                                       Container(
                                         width: 6, height: 6,
-                                        decoration: BoxDecoration(color: timelineColor, shape: BoxShape.circle),
+                                        decoration: BoxDecoration(
+                                          color: isDark ? Colors.black87 : Colors.white, 
+                                          shape: BoxShape.circle
+                                        ),
                                       ),
                                       const SizedBox(width: 4),
                                       Text(
@@ -191,7 +201,7 @@ class MealCard extends StatelessWidget {
                                           fontSize: 10,
                                           fontWeight: FontWeight.w900,
                                           letterSpacing: 0.5,
-                                          color: isDark ? timelineColor : timelineColor.withAlpha(255),
+                                          color: isDark ? Colors.black87 : Colors.white,
                                         ),
                                       ),
                                     ],

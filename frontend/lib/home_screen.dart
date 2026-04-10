@@ -57,9 +57,10 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _fetchMenuFromApi() async {
     setState(() => _isLoading = true);
     try {
-      // Using Android localhost IP: 'http://10.0.2.2:8000/menu'
-      // Using iOS Simulator IP: 'http://127.0.0.1:8000/menu'
-      final url = Uri.parse('http://127.0.0.1:8000/menu'); 
+      // Using production Render URL
+      final String baseUrl = 'https://mess-backend-uydy.onrender.com/menu';
+      
+      final url = Uri.parse(baseUrl); 
       final response = await http.get(url);
       
       if (response.statusCode == 200) {
@@ -246,10 +247,10 @@ class _HomeScreenState extends State<HomeScreen> {
     };
     
     final colors = {
-      'breakfast': Theme.of(context).colorScheme.primary,
-      'lunch': Theme.of(context).colorScheme.primary,
-      'dinner': Theme.of(context).colorScheme.primary,
-      'snacks': Theme.of(context).colorScheme.primary,
+      'breakfast': Colors.amber,          // Morning vibes
+      'lunch': Colors.teal,               // Fresh daytime
+      'snacks': Colors.deepOrangeAccent,  // Evening burst
+      'dinner': Colors.indigoAccent,      // Night time
     };
     
     final times = {

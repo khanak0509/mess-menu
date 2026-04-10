@@ -13,6 +13,7 @@ class QRPassButton extends StatefulWidget {
 
 class _QRPassButtonState extends State<QRPassButton> {
   String? _savedQRPath;
+  bool _isProcessing = false;
 
   @override
   void initState() {
@@ -28,21 +29,36 @@ class _QRPassButtonState extends State<QRPassButton> {
   }
 
   Future<void> _pickAndSaveQR() async {
-    final picker = ImagePicker();
-    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+    if (_isProcessing) return;
+    setState(() => _isProcessing = true);
     
-    if (pickedFile != null) {
-      final directory = await getApplicationDocumentsDirectory();
-      final String safePath = '${directory.path}/user_qr.png';
+    try {
+      final picker = ImagePicker();
+      final pickedFile = await picker.pickImage(source: ImageSource.gallery);
       
-      final File newImage = await File(pickedFile.path).copy(safePath);
-      
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('local_qr_path', newImage.path);
-      
-      setState(() {
-        _savedQRPath = newImage.path;
-      });
+      if (pickedFile != null) {
+        final directory = await getApplicationDocumentsDirectory();
+        final String safePath = '${directory.path}/user_qr.png';
+        
+        final File newImage = await File(pickedFile.path).copy(safePath);
+        
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('local_qr_path', newImage.path);
+        
+        setState(() {
+          _savedQRPath = newImage.path;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to pick QR: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isProcessing = false);
+      }
     }
   }
 
@@ -124,6 +140,15 @@ class _QRPassButtonState extends State<QRPassButton> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isProcessing) {
+      return Container(
+        margin: const EdgeInsets.only(right: 8),
+        width: 24,
+        height: 24,
+        child: const CircularProgressIndicator(strokeWidth: 2),
+      );
+    }
+    
     return IconButton(
       onPressed: () {
         if (_savedQRPath == null) {
