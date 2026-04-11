@@ -30,6 +30,7 @@ class NotificationService {
   Future<void> requestPermissions() async {
     final androidImpl = flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
     await androidImpl?.requestNotificationsPermission();
+    await androidImpl?.requestExactAlarmsPermission();
     
     final IOSFlutterLocalNotificationsPlugin? iosImplementation = flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>();
     await iosImplementation?.requestPermissions(alert: true, badge: true, sound: true);
@@ -72,10 +73,10 @@ class NotificationService {
            final main = cMenu['snacks']['Main'] ?? "Check the app for details!";
            _scheduleNotification(targetDate, 16, 45, 'Snack Time! ☕', 'Main item: $main');
         }
-        // Dinner (7:30 PM) -> 15 min earlier (7:15 PM)
+        // Dinner (10:30 PM) -> 15 min earlier (10:15 PM)
         if (cMenu.containsKey('dinner')) {
            final main = cMenu['dinner']['Main'] ?? "Check the app for details!";
-           _scheduleNotification(targetDate, 19, 15, 'Dinner Time! 🍽️', 'Main item: $main');
+           _scheduleNotification(targetDate, 22, 15, 'Dinner Time! 🍽️', 'Main item: $main');
         }
     }
   }

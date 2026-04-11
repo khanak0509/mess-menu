@@ -7,6 +7,7 @@ class MealCard extends StatelessWidget {
   final Color timelineColor;
   final String timeRange;
   final bool isActive;
+  final List<String> favorites;
 
   const MealCard({
     super.key,
@@ -16,6 +17,7 @@ class MealCard extends StatelessWidget {
     required this.timelineColor,
     required this.timeRange,
     this.isActive = false,
+    this.favorites = const [],
   });
 
   @override
@@ -38,6 +40,34 @@ class MealCard extends StatelessWidget {
     if (isValid(mainText)) parts.add(mainText);
     if (isValid(complimentary)) parts.add(complimentary);
     if (isValid(compulsory)) parts.add(compulsory);
+
+    final partsText = parts.join('\n').toLowerCase();
+    
+    // Split the meals into individual identifiable dishes:
+    final List<String> availableItems = partsText
+        .split(RegExp(r'[,\n\/&]| and '))
+        .map((e) => e.replaceAll(RegExp(r'\s+'), ' ').trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
+    
+    bool hasFavorite = false;
+    if (favorites.isNotEmpty) {
+      for (final fav in favorites) {
+        final f = fav.toLowerCase().replaceAll(RegExp(r'\s+'), ' ').trim();
+        if (f.isEmpty) continue;
+        
+        // Exact element match, or string starts with "f " (e.g. "aloo paratha (butter)"), 
+        // to prevent "aloo" from matching "aloo paratha" while allowing "aloo paratha" to match "aloo paratha (butter)"
+        if (availableItems.any((item) => 
+            item == f || 
+            item.startsWith('$f ') || 
+            item.endsWith(' $f') || 
+            item == '${f}s')) {
+          hasFavorite = true;
+          break;
+        }
+      }
+    }
 
     final paragraphText = parts.join('\n').replaceAll(', ,', ',');
 
@@ -142,12 +172,17 @@ class MealCard extends StatelessWidget {
                           color: timelineColor,
                           width: 8.0,
                         ),
+                      ) : (hasFavorite ? Border(
+                        left: BorderSide(
+                          color: Colors.amber.shade400,
+                          width: 6.0,
+                        ),
                       ) : Border(
                         left: BorderSide(
                           color: timelineColor.withAlpha(150),
                           width: 4.0,
                         ),
-                      ),
+                      )),
                     ),
                     child: Padding(
                       padding: const EdgeInsets.all(20.0),
@@ -159,57 +194,71 @@ class MealCard extends StatelessWidget {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
-                          Row(
-                            children: [
-                              Text(
-                                mealName,
-                                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                      fontWeight: FontWeight.w800,
-                                      letterSpacing: -0.5,
-                                      fontSize: 20,
-                                      color: textColor,
-                                    ),
-                              ),
-                              if (isActive) ...[
-                                const SizedBox(width: 8),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: timelineColor, // Solid vibrant background
-                                    borderRadius: BorderRadius.circular(6),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: timelineColor.withAlpha(isDark ? 80 : 120),
-                                        blurRadius: 6,
-                                        offset: const Offset(0, 2),
-                                      ),
-                                    ],
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      Container(
-                                        width: 6, height: 6,
-                                        decoration: BoxDecoration(
-                                          color: isDark ? Colors.black87 : Colors.white, 
-                                          shape: BoxShape.circle
+                          Expanded(
+                            child: Row(
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    mealName,
+                                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                          fontWeight: FontWeight.w800,
+                                          letterSpacing: -0.5,
+                                          fontSize: 20,
+                                          color: textColor,
                                         ),
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        'NOW',
-                                        style: TextStyle(
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.w900,
-                                          letterSpacing: 0.5,
-                                          color: isDark ? Colors.black87 : Colors.white,
-                                        ),
-                                      ),
-                                    ],
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
+                                if (isActive) ...[
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: timelineColor, // Solid vibrant background
+                                      borderRadius: BorderRadius.circular(6),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: timelineColor.withAlpha(isDark ? 80 : 120),
+                                          blurRadius: 6,
+                                          offset: const Offset(0, 2),
+                                        ),
+                                      ],
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Container(
+                                          width: 6, height: 6,
+                                          decoration: BoxDecoration(
+                                            color: isDark ? Colors.black87 : Colors.white, 
+                                            shape: BoxShape.circle
+                                          ),
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          'NOW',
+                                          style: TextStyle(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w900,
+                                            letterSpacing: 0.5,
+                                            color: isDark ? Colors.black87 : Colors.white,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                                if (hasFavorite) ...[
+                                  const SizedBox(width: 6),
+                                  Icon(
+                                    Icons.star_rounded,
+                                    color: Colors.amber.shade400,
+                                    size: 16,
+                                  ),
+                                ],
                               ],
-                            ],
+                            ),
                           ),
+                          const SizedBox(width: 8),
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                             decoration: BoxDecoration(

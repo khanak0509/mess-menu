@@ -108,8 +108,12 @@ class _QRPassButtonState extends State<QRPassButton> {
                         
                         try {
                           await File(_savedQRPath!).delete();
-                        } catch(e) {}
+                        } catch(e) {
+                          // Ignore file delete error if file doesn't exist
+                        }
 
+                        if (!context.mounted) return;
+                        
                         setState(() {
                           _savedQRPath = null;
                         });

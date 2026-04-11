@@ -13,7 +13,7 @@ final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterL
 void callbackDispatcher() {
   Workmanager().executeTask((task, inputData) async {
     try {
-      final url = Uri.parse('http://127.0.0.1:8000/menu');
+      final url = Uri.parse('https://mess-backend-uydy.onrender.com/menu');
       final response = await http.get(url);
       
       if (response.statusCode == 200) {

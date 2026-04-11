@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shimmer/shimmer.dart';
 import 'meal_card.dart';
 import 'qr_pass_button.dart';
+import 'favorites_sheet.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -21,6 +22,7 @@ class _HomeScreenState extends State<HomeScreen> {
   
   late String _selectedDay;
   Map<String, dynamic>? _fullMenu;
+  List<String> _userFavorites = [];
   bool _isLoading = true;
   String _errorMessage = '';
 
@@ -39,6 +41,11 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       final prefs = await SharedPreferences.getInstance();
       final cachedMenu = prefs.getString('cached_menu');
+      final favMap = prefs.getStringList('favorite_items') ?? [];
+      
+      setState(() {
+         _userFavorites = favMap;
+      });
 
       if (cachedMenu != null) {
         setState(() {
@@ -92,7 +99,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (currentHour < 10.0) return "Breakfast";
     if (currentHour < 14.5) return "Lunch";
     if (currentHour < 18.0) return "Snacks";
-    if (currentHour < 21.5) return "Dinner";
+    if (currentHour < 22.5) return "Dinner";
     return "Breakfast (Tomorrow)";
   }
 
@@ -109,7 +116,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (meal == 'breakfast' && currentHour >= 7.5 && currentHour < 10.0) return true;
     if (meal == 'lunch' && currentHour >= 12.25 && currentHour < 14.75) return true;
     if (meal == 'snacks' && currentHour >= 17.5 && currentHour < 18.5) return true;
-    if (meal == 'dinner' && currentHour >= 19.5 && currentHour < 21.5) return true;
+    if (meal == 'dinner' && currentHour >= 19.5 && currentHour < 22.5) return true;
     
     return false;
   }
@@ -198,9 +205,17 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         title: const Text('IITJ Menu'),
         centerTitle: false,
-        actions: const [
-          QRPassButton(),
-          SizedBox(width: 8),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.star_outline_rounded),
+            onPressed: () {
+              FavoritesSheet.show(context).then((_) {
+                 _loadMenu();
+              });
+            },
+          ),
+          const QRPassButton(),
+          const SizedBox(width: 8),
         ],
       ),
       body: _isLoading
@@ -257,7 +272,7 @@ class _HomeScreenState extends State<HomeScreen> {
       'breakfast': '7:30 AM - 10:00 AM',
       'lunch': '12:15 PM - 2:45 PM',
       'snacks': '5:30 PM - 6:30 PM',
-      'dinner': '7:30 PM - 9:30 PM',
+      'dinner': '7:30 PM - 10:30 PM',
     };
     
     final meals = mealOrder.where((meal) => cMenu.containsKey(meal)).toList();
