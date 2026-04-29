@@ -70,22 +70,68 @@ class _HomeScreenState extends State<HomeScreen> {
     final selected = await showDialog<String>(
       context: context,
       barrierDismissible: false,
-      builder: (context) {
+      builder: (dialogContext) {
+        final theme = Theme.of(dialogContext);
+        final cs = theme.colorScheme;
+
         return AlertDialog(
-          title: const Text('Select your menu preference'),
-          content: const Text(
-            'You can change this anytime from the top-right toggle.',
+          title: Text(
+            'Select your menu preference',
+            style: theme.textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.5,
+              color: cs.onSurface,
+            ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, 'veg'),
-              child: const Text('Veg'),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(context, 'nonveg'),
-              child: const Text('Non-Veg'),
-            ),
-          ],
+          contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'You can change this anytime from the top-right toggle.',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: cs.onSurfaceVariant,
+                  height: 1.45,
+                ),
+              ),
+              const SizedBox(height: 22),
+              Row(
+                children: [
+                  Expanded(
+                    child: FilledButton(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: cs.primary,
+                        foregroundColor: cs.onPrimary,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      onPressed: () => Navigator.of(dialogContext).pop('veg'),
+                      child: const Text('Veg'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: FilledButton(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: cs.primary,
+                        foregroundColor: cs.onPrimary,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      onPressed: () =>
+                          Navigator.of(dialogContext).pop('nonveg'),
+                      child: const Text('Non-Veg'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         );
       },
     );
@@ -494,53 +540,52 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildPreferenceToggle() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    // Stronger than shade600, still clearly veg / non-veg
+    const vegBold = Color(0xFF1B5E20);
+    const nonVegBold = Color(0xFFB71C1C);
+
     Widget circle({
       required String value,
       required Color color,
       required IconData icon,
     }) {
       final selected = _dietPreference == value;
+      final fill = selected
+          ? color
+          : color.withAlpha(isDark ? 130 : 105);
+      final borderColor = selected ? color : color.withAlpha(220);
       return GestureDetector(
         onTap: () => _savePreference(value),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 220),
-          width: 32,
-          height: 32,
-          margin: const EdgeInsets.symmetric(horizontal: 4),
+          width: 34,
+          height: 34,
+          margin: const EdgeInsets.symmetric(horizontal: 5),
           decoration: BoxDecoration(
-            color: selected ? color : color.withAlpha(70),
+            color: fill,
             shape: BoxShape.circle,
-            border: Border.all(
-              color: selected ? color : color.withAlpha(130),
-              width: selected ? 2.2 : 1.2,
-            ),
+            border: Border.all(color: borderColor, width: selected ? 2.5 : 1.8),
             boxShadow: selected
                 ? [
                     BoxShadow(
-                      color: color.withAlpha(110),
-                      blurRadius: 8,
-                      spreadRadius: 1,
+                      color: color.withAlpha(isDark ? 120 : 85),
+                      blurRadius: 7,
+                      spreadRadius: 0,
                     ),
                   ]
                 : null,
           ),
-          child: Icon(icon, size: 18, color: Colors.white),
+          child: Icon(icon, size: 19, color: Colors.white),
         ),
       );
     }
 
     return Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        circle(
-          value: 'veg',
-          color: Colors.green.shade600,
-          icon: Icons.eco_rounded,
-        ),
-        circle(
-          value: 'nonveg',
-          color: Colors.red.shade600,
-          icon: Icons.set_meal_rounded,
-        ),
+        circle(value: 'veg', color: vegBold, icon: Icons.eco_rounded),
+        circle(value: 'nonveg', color: nonVegBold, icon: Icons.set_meal_rounded),
       ],
     );
   }

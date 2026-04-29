@@ -81,6 +81,32 @@ class MealCard extends StatelessWidget {
 
     final bool isDark = Theme.of(context).brightness == Brightness.dark;
 
+    // Non-veg block: indigo (distinct from veg green, not harsh red)
+    final nonVegLabelColor = isDark
+        ? const Color(0xFF9FA8DA)
+        : const Color(0xFF3949AB);
+    final nonVegBodyColor = isDark
+        ? const Color(0xFFC5CAE9)
+        : const Color(0xFF283593);
+
+    // Special dinner: soft violet (stands out without deepOrange clash)
+    final specialBg = Color.alphaBlend(
+      (isDark ? const Color(0xFF7E57C2) : const Color(0xFF5E35B1)).withAlpha(
+        isDark ? 36 : 22,
+      ),
+      isDark ? const Color(0xFF1E1E1E) : Colors.white,
+    );
+    final specialBorder =
+        (isDark ? const Color(0xFFB39DDB) : const Color(0xFF5E35B1)).withAlpha(
+          isDark ? 100 : 85,
+        );
+    final specialIconColor = isDark
+        ? const Color(0xFFD1C4E9)
+        : const Color(0xFF4527A0);
+    final specialTextColor = isDark
+        ? const Color(0xFFE1BEE7)
+        : const Color(0xFF4A148C);
+
     // Very subtle, minimal colors for modern aesthetic apps (like Instagram/YT aesthetics)
     final neutralLineColor = isDark ? Colors.white12 : Colors.black12;
 
@@ -309,62 +335,28 @@ class MealCard extends StatelessWidget {
                               ),
                             ],
                           ),
-                          const SizedBox(height: 10),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 5,
+                          if (hasSpecialNote) ...[
+                            const SizedBox(height: 10),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.auto_awesome_rounded,
+                                  color: specialIconColor,
+                                  size: 16,
                                 ),
-                                decoration: BoxDecoration(
-                                  color: preference == 'nonveg'
-                                      ? Colors.red.withAlpha(24)
-                                      : Colors.green.withAlpha(24),
-                                  borderRadius: BorderRadius.circular(999),
-                                  border: Border.all(
-                                    color: preference == 'nonveg'
-                                        ? Colors.red.withAlpha(120)
-                                        : Colors.green.withAlpha(120),
-                                  ),
-                                ),
-                                child: Text(
-                                  preference == 'nonveg'
-                                      ? 'Non-Veg Menu'
-                                      : 'Veg Menu',
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Special dinner',
                                   style: TextStyle(
-                                    fontSize: 11,
+                                    fontSize: 11.5,
                                     fontWeight: FontWeight.w700,
-                                    color: preference == 'nonveg'
-                                        ? Colors.red.shade300
-                                        : Colors.green.shade300,
+                                    color: specialTextColor.withAlpha(230),
                                   ),
                                 ),
-                              ),
-                              if (hasSpecialNote)
-                                Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      Icons.local_fire_department_rounded,
-                                      color: Colors.deepOrange.shade400,
-                                      size: 16,
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      'Special dinner',
-                                      style: TextStyle(
-                                        fontSize: 11.5,
-                                        fontWeight: FontWeight.w700,
-                                        color: Colors.deepOrange.shade300,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                            ],
-                          ),
+                              ],
+                            ),
+                          ],
                           const SizedBox(height: 16),
                           if (!hasSpecialNote) ...[
                             if (preference == 'nonveg') ...[
@@ -410,7 +402,7 @@ class MealCard extends StatelessWidget {
                                           .bodySmall
                                           ?.copyWith(
                                             fontWeight: FontWeight.w700,
-                                            color: Colors.red.shade300,
+                                            color: nonVegLabelColor,
                                             letterSpacing: 0.2,
                                           ),
                                     ),
@@ -424,7 +416,7 @@ class MealCard extends StatelessWidget {
                                             height: 1.6,
                                             fontSize: 15,
                                             fontWeight: FontWeight.w600,
-                                            color: Colors.red.shade200,
+                                            color: nonVegBodyColor,
                                           ),
                                     ),
                                   ],
@@ -477,13 +469,9 @@ class MealCard extends StatelessWidget {
                               margin: const EdgeInsets.only(top: 14),
                               padding: const EdgeInsets.all(12),
                               decoration: BoxDecoration(
-                                color: Colors.deepOrange.withAlpha(
-                                  isDark ? 30 : 18,
-                                ),
+                                color: specialBg,
                                 borderRadius: BorderRadius.circular(10),
-                                border: Border.all(
-                                  color: Colors.deepOrange.withAlpha(110),
-                                ),
+                                border: Border.all(color: specialBorder),
                               ),
                               child: Row(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -491,7 +479,7 @@ class MealCard extends StatelessWidget {
                                   Icon(
                                     Icons.celebration_rounded,
                                     size: 16,
-                                    color: Colors.deepOrange.shade300,
+                                    color: specialIconColor,
                                   ),
                                   const SizedBox(width: 8),
                                   Expanded(
@@ -501,7 +489,7 @@ class MealCard extends StatelessWidget {
                                         fontSize: 13.5,
                                         height: 1.35,
                                         fontWeight: FontWeight.w600,
-                                        color: Colors.deepOrange.shade200,
+                                        color: specialTextColor,
                                       ),
                                     ),
                                   ),
