@@ -9,6 +9,7 @@ import 'notification_service.dart';
 
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
     FlutterLocalNotificationsPlugin();
+const String apiBaseUrl = 'https://mess-menu-v458.onrender.com';
 
 @pragma('vm:entry-point')
 void callbackDispatcher() {
@@ -16,13 +17,11 @@ void callbackDispatcher() {
     try {
       final prefs = await SharedPreferences.getInstance();
       final pref = prefs.getString('diet_preference') ?? 'veg';
-      final url = Uri.parse(
-        'https://mess-backend-uydy.onrender.com/menu?preference=$pref',
-      );
+      final url = Uri.parse('$apiBaseUrl/menu?preference=$pref');
       final response = await http.get(url);
 
       if (response.statusCode == 200) {
-        await prefs.setString('cached_menu', response.body);
+        await prefs.setString('cached_menu_$pref', response.body);
 
         // Schedule new notifications after data update
         await NotificationService().init();

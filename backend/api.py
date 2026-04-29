@@ -46,7 +46,11 @@ DEFAULT_CONFIG = {
         "snacks": "17:30-18:30",
         "dinner": "19:30-22:30",
     },
-    "special_dinner_text": "",
+    "special_dinner": {
+        "date": "",
+        "veg_text": "",
+        "nonveg_text": "",
+    },
 }
 
 
@@ -107,7 +111,14 @@ def _get_config():
     merged = DEFAULT_CONFIG.copy()
     raw = config_doc.to_dict() or {}
     merged["timings"] = {**DEFAULT_CONFIG["timings"], **(raw.get("timings") or {})}
-    merged["special_dinner_text"] = raw.get("special_dinner_text", "")
+    raw_special = raw.get("special_dinner") or {}
+    merged["special_dinner"] = {
+        **DEFAULT_CONFIG["special_dinner"],
+        **raw_special,
+    }
+    # Backward compatibility: old single text becomes veg special text.
+    if raw.get("special_dinner_text") and not merged["special_dinner"]["veg_text"]:
+        merged["special_dinner"]["veg_text"] = raw.get("special_dinner_text", "")
     return merged
 
 @app.get("/menu")
@@ -169,7 +180,10 @@ async def friendly_admin_dashboard():
     """Provides a beautiful, easy-to-use webpage for uploading the new monthly menu."""
     config = _get_config()
     timings = config["timings"]
-    special_dinner_text = config.get("special_dinner_text", "")
+    special = config.get("special_dinner", {})
+    special_date = special.get("date", "")
+    special_veg_text = special.get("veg_text", "")
+    special_nonveg_text = special.get("nonveg_text", "")
 
     html_content = f"""
     <!DOCTYPE html>
@@ -247,8 +261,16 @@ async def friendly_admin_dashboard():
                         </div>
                     </div>
                     <div style="margin-top:14px;">
-                        <label>Special Dinner Text (shown highlighted in app)</label>
-                        <textarea name="special_dinner_text" placeholder="Example: Special dinner tonight - Paneer Tikka + Kheer">{html.escape(special_dinner_text)}</textarea>
+                        <label>Special Dinner Date (YYYY-MM-DD)</label>
+                        <input type="text" name="special_dinner_date" value="{html.escape(special_date)}" placeholder="Example: 2026-04-29">
+                    </div>
+                    <div style="margin-top:14px;">
+                        <label>Special Dinner Text (Veg)</label>
+                        <textarea name="special_dinner_veg_text" placeholder="Example: Special dinner (veg) - Paneer Tikka + Kheer">{html.escape(special_veg_text)}</textarea>
+                    </div>
+                    <div style="margin-top:14px;">
+                        <label>Special Dinner Text (Non-Veg)</label>
+                        <textarea name="special_dinner_nonveg_text" placeholder="Example: Special dinner (non-veg) - Chicken Biryani + Sheermal">{html.escape(special_nonveg_text)}</textarea>
                     </div>
                     <button type="submit">Save App Settings</button>
                 </form>
@@ -309,7 +331,9 @@ async def update_config(
     lunch: str = Form(...),
     snacks: str = Form(...),
     dinner: str = Form(...),
-    special_dinner_text: str = Form(default=""),
+    special_dinner_date: str = Form(default=""),
+    special_dinner_veg_text: str = Form(default=""),
+    special_dinner_nonveg_text: str = Form(default=""),
 ):
     if not db:
         raise HTTPException(status_code=500, detail="Our database is taking a nap right now (not initialized)!")
@@ -322,7 +346,11 @@ async def update_config(
             "snacks": snacks.strip(),
             "dinner": dinner.strip(),
         },
-        "special_dinner_text": special_dinner_text.strip(),
+        "special_dinner": {
+            "date": special_dinner_date.strip(),
+            "veg_text": special_dinner_veg_text.strip(),
+            "nonveg_text": special_dinner_nonveg_text.strip(),
+        },
     }
     db.collection(CONFIG_COLLECTION).document(CONFIG_DOC).set(new_config)
     return HTMLResponse(

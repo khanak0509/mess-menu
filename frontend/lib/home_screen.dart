@@ -15,6 +15,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  static const String _apiBaseUrl = 'https://mess-menu-v458.onrender.com';
   final List<String> days = const [
     'Monday',
     'Tuesday',
@@ -30,7 +31,9 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isLoading = true;
   String _errorMessage = '';
   String _dietPreference = 'veg';
-  String _specialDinnerText = '';
+  String _specialDinnerDate = '';
+  String _specialDinnerVegText = '';
+  String _specialDinnerNonVegText = '';
   Map<String, String> _mealTimings = {
     'weekday_breakfast': '07:30-10:00',
     'weekend_breakfast': '08:00-10:30',
@@ -90,25 +93,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _loadMenu() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final cachedMenu = prefs.getString('cached_menu');
-
-      if (cachedMenu != null) {
-        final decoded = json.decode(cachedMenu);
-        if (decoded is Map<String, dynamic>) {
-          final cachedPref = (decoded['preference'] ?? 'veg').toString();
-          if (cachedPref == _dietPreference) {
-            _applyMenuPayload(decoded);
-            return;
-          }
-        }
-      }
-
-      await _fetchMenuFromApi();
-    } catch (e) {
-      await _fetchMenuFromApi();
-    }
+    await _fetchMenuFromApi();
   }
 
   void _applyMenuPayload(Map<String, dynamic> payload) {
@@ -118,7 +103,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     if (config is Map<String, dynamic>) {
       final timingsRaw = config['timings'];
-      final specialRaw = config['special_dinner_text'];
+      final specialRaw = config['special_dinner'];
       if (timingsRaw is Map<String, dynamic>) {
         setState(() {
           _mealTimings = {
@@ -127,9 +112,24 @@ class _HomeScreenState extends State<HomeScreen> {
           };
         });
       }
-      if (specialRaw != null) {
+      if (specialRaw is Map<String, dynamic>) {
         setState(() {
-          _specialDinnerText = specialRaw.toString().trim();
+          _specialDinnerDate = (specialRaw['date'] ?? '').toString().trim();
+          _specialDinnerVegText = (specialRaw['veg_text'] ?? '')
+              .toString()
+              .trim();
+          _specialDinnerNonVegText = (specialRaw['nonveg_text'] ?? '')
+              .toString()
+              .trim();
+        });
+      } else if (config['special_dinner_text'] != null) {
+        // Backward compatibility for old config structure.
+        setState(() {
+          _specialDinnerDate = '';
+          _specialDinnerVegText = (config['special_dinner_text'] ?? '')
+              .toString()
+              .trim();
+          _specialDinnerNonVegText = '';
         });
       }
     }
@@ -153,35 +153,47 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _fetchMenuFromApi() async {
     setState(() => _isLoading = true);
     try {
-      final url = Uri.parse(
-        'https://mess-backend-uydy.onrender.com/menu?preference=$_dietPreference',
-      );
+      final url = Uri.parse('$_apiBaseUrl/menu?preference=$_dietPreference');
       final response = await http.get(url);
 
       if (response.statusCode == 200) {
         final payload = json.decode(response.body);
         final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('cached_menu', response.body);
+        await prefs.setString('cached_menu_$_dietPreference', response.body);
         if (payload is Map<String, dynamic>) {
+          setState(() {
+            _errorMessage = '';
+          });
           _applyMenuPayload(payload);
         } else {
-          setState(() {
-            _errorMessage = 'Unexpected API response format.';
-            _isLoading = false;
-          });
+          await _loadFromCacheOrFail('Unexpected API response format.');
         }
       } else {
-        setState(() {
-          _errorMessage = 'Failed to load menu';
-          _isLoading = false;
-        });
+        await _loadFromCacheOrFail('Failed to load latest menu from server.');
       }
     } catch (e) {
-      setState(() {
-        _errorMessage = 'No cached data & failed to connect to API.';
-        _isLoading = false;
-      });
+      await _loadFromCacheOrFail('Unable to connect. Showing last saved menu.');
     }
+  }
+
+  Future<void> _loadFromCacheOrFail(String fallbackMessage) async {
+    final prefs = await SharedPreferences.getInstance();
+    final cachedMenu = prefs.getString('cached_menu_$_dietPreference');
+    if (cachedMenu != null) {
+      final decoded = json.decode(cachedMenu);
+      if (decoded is Map<String, dynamic>) {
+        setState(() {
+          _errorMessage = fallbackMessage;
+        });
+        _applyMenuPayload(decoded);
+        return;
+      }
+    }
+
+    setState(() {
+      _errorMessage = 'No cached data available for $_dietPreference menu.';
+      _isLoading = false;
+    });
   }
 
   /*
@@ -251,6 +263,24 @@ class _HomeScreenState extends State<HomeScreen> {
     final range = _getRangeForMeal(meal, isWeekend);
     if (range == null) return '';
     return '${_formatTimeTo12h(range.$1)} - ${_formatTimeTo12h(range.$2)}';
+  }
+
+  String _todayIsoDate() {
+    final now = DateTime.now();
+    final m = now.month.toString().padLeft(2, '0');
+    final d = now.day.toString().padLeft(2, '0');
+    return '${now.year}-$m-$d';
+  }
+
+  String _getSpecialDinnerForSelectedDay() {
+    if (_selectedDay != _getCurrentDay()) return '';
+    if (_specialDinnerDate.isEmpty) return '';
+    if (_specialDinnerDate != _todayIsoDate()) return '';
+
+    final text = _dietPreference == 'nonveg'
+        ? _specialDinnerNonVegText
+        : _specialDinnerVegText;
+    return text.trim();
   }
 
   Widget _buildDaySelector() {
@@ -340,6 +370,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final hasMenuForSelectedDay =
+        _fullMenu != null && _fullMenu![_selectedDay] != null;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('IITJ Menu'),
@@ -352,26 +385,55 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       body: _isLoading
           ? _buildShimmerLoading()
-          : _errorMessage.isNotEmpty
-          ? Center(
-              child: Text(
-                _errorMessage,
-                style: const TextStyle(color: Colors.red),
-              ),
-            )
-          : RefreshIndicator(
+          : hasMenuForSelectedDay
+          ? RefreshIndicator(
               onRefresh: _fetchMenuFromApi,
               child: ListView(
                 children: [
                   const SizedBox(height: 8),
-                  // _buildHeroSection(), // Removed huge "UP NEXT" header card based on pure minimalistic layout requirement
                   _buildDaySelector(),
+                  if (_errorMessage.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 10,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.withAlpha(28),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: Colors.orange.withAlpha(90),
+                          ),
+                        ),
+                        child: Text(
+                          _errorMessage,
+                          style: TextStyle(
+                            color:
+                                Theme.of(context).brightness == Brightness.dark
+                                ? Colors.orange.shade200
+                                : Colors.orange.shade900,
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
                   const SizedBox(height: 16),
                   AnimatedSwitcher(
                     duration: const Duration(milliseconds: 300),
                     child: _buildMealsList(key: ValueKey(_selectedDay)),
                   ),
                 ],
+              ),
+            )
+          : Center(
+              child: Text(
+                _errorMessage.isEmpty
+                    ? 'No menu found for this day.'
+                    : _errorMessage,
+                style: const TextStyle(color: Colors.red),
               ),
             ),
     );
@@ -422,7 +484,9 @@ class _HomeScreenState extends State<HomeScreen> {
             timeRange: _getDisplayTimeRange(meal),
             isActive: _isMealActive(meal, _selectedDay),
             preference: _dietPreference,
-            specialNote: meal == 'dinner' ? _specialDinnerText : '',
+            specialNote: meal == 'dinner'
+                ? _getSpecialDinnerForSelectedDay()
+                : '',
           );
         }).toList(),
       ),

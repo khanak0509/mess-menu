@@ -70,15 +70,12 @@ class MealCard extends StatelessWidget {
       return true;
     }
 
-    final List<String> parts = [];
-    if (isValid(mainText)) parts.add(mainText);
-    if (isValid(complimentary)) parts.add(complimentary);
-    if (isValid(compulsory)) parts.add(compulsory);
-    if (preference == 'nonveg' && isValid(nonVeg)) {
-      parts.add('Non-Veg: $nonVeg');
-    }
+    final List<String> vegParts = [];
+    if (isValid(mainText)) vegParts.add(mainText);
+    if (isValid(complimentary)) vegParts.add(complimentary);
+    if (isValid(compulsory)) vegParts.add(compulsory);
 
-    final paragraphText = parts.join('\n').replaceAll(', ,', ',');
+    final vegText = vegParts.join('\n').replaceAll(', ,', ',');
     final hasSpecialNote =
         specialNote.trim().isNotEmpty && mealName.toLowerCase() == 'dinner';
 
@@ -285,44 +282,6 @@ class MealCard extends StatelessWidget {
                                         ),
                                       ),
                                     ],
-                                    Container(
-                                      margin: const EdgeInsets.only(left: 8),
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 8,
-                                        vertical: 4,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: preference == 'nonveg'
-                                            ? Colors.red.withAlpha(24)
-                                            : Colors.green.withAlpha(24),
-                                        borderRadius: BorderRadius.circular(8),
-                                        border: Border.all(
-                                          color: preference == 'nonveg'
-                                              ? Colors.red.withAlpha(120)
-                                              : Colors.green.withAlpha(120),
-                                        ),
-                                      ),
-                                      child: Text(
-                                        preference == 'nonveg'
-                                            ? 'Non-Veg'
-                                            : 'Veg',
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w700,
-                                          color: preference == 'nonveg'
-                                              ? Colors.red.shade300
-                                              : Colors.green.shade300,
-                                        ),
-                                      ),
-                                    ),
-                                    if (hasSpecialNote) ...[
-                                      const SizedBox(width: 6),
-                                      Icon(
-                                        Icons.local_fire_department_rounded,
-                                        color: Colors.deepOrange.shade400,
-                                        size: 16,
-                                      ),
-                                    ],
                                   ],
                                 ),
                               ),
@@ -350,20 +309,140 @@ class MealCard extends StatelessWidget {
                               ),
                             ],
                           ),
-                          const SizedBox(height: 16),
-                          // Content - Full Menu, no truncating, no maxlines!
-                          Text(
-                            paragraphText,
-                            style: Theme.of(context).textTheme.bodyMedium
-                                ?.copyWith(
-                                  height: 1.6,
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w500,
-                                  color: textColor.withAlpha(200),
+                          const SizedBox(height: 10),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 5,
                                 ),
+                                decoration: BoxDecoration(
+                                  color: preference == 'nonveg'
+                                      ? Colors.red.withAlpha(24)
+                                      : Colors.green.withAlpha(24),
+                                  borderRadius: BorderRadius.circular(999),
+                                  border: Border.all(
+                                    color: preference == 'nonveg'
+                                        ? Colors.red.withAlpha(120)
+                                        : Colors.green.withAlpha(120),
+                                  ),
+                                ),
+                                child: Text(
+                                  preference == 'nonveg'
+                                      ? 'Non-Veg Menu'
+                                      : 'Veg Menu',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                    color: preference == 'nonveg'
+                                        ? Colors.red.shade300
+                                        : Colors.green.shade300,
+                                  ),
+                                ),
+                              ),
+                              if (hasSpecialNote)
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.local_fire_department_rounded,
+                                      color: Colors.deepOrange.shade400,
+                                      size: 16,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      'Special dinner',
+                                      style: TextStyle(
+                                        fontSize: 11.5,
+                                        fontWeight: FontWeight.w700,
+                                        color: Colors.deepOrange.shade300,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                            ],
                           ),
+                          const SizedBox(height: 16),
+                          if (!hasSpecialNote) ...[
+                            if (preference == 'nonveg') ...[
+                              if (vegText.trim().isNotEmpty)
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Veg Items',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodySmall
+                                          ?.copyWith(
+                                            fontWeight: FontWeight.w700,
+                                            color: Colors.green.shade400,
+                                            letterSpacing: 0.2,
+                                          ),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      vegText,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodyMedium
+                                          ?.copyWith(
+                                            height: 1.6,
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.w500,
+                                            color: textColor.withAlpha(200),
+                                          ),
+                                    ),
+                                    const SizedBox(height: 14),
+                                  ],
+                                ),
+                              if (isValid(nonVeg))
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Non-Veg Items',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodySmall
+                                          ?.copyWith(
+                                            fontWeight: FontWeight.w700,
+                                            color: Colors.red.shade300,
+                                            letterSpacing: 0.2,
+                                          ),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      nonVeg,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodyMedium
+                                          ?.copyWith(
+                                            height: 1.6,
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.w600,
+                                            color: Colors.red.shade200,
+                                          ),
+                                    ),
+                                  ],
+                                ),
+                            ] else
+                              Text(
+                                vegText,
+                                style: Theme.of(context).textTheme.bodyMedium
+                                    ?.copyWith(
+                                      height: 1.6,
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w500,
+                                      color: textColor.withAlpha(200),
+                                    ),
+                              ),
+                          ],
                           // Jain Option
-                          if (isValid(jain))
+                          if (!hasSpecialNote && isValid(jain))
                             Padding(
                               padding: const EdgeInsets.only(top: 16.0),
                               child: Row(
