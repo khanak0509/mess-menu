@@ -6,7 +6,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shimmer/shimmer.dart';
 import 'meal_card.dart';
 import 'qr_pass_button.dart';
-import 'favorites_sheet.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -17,66 +16,160 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final List<String> days = const [
-    'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'
+    'Monday',
+    'Tuesday',
+    'Wednesday',
+    'Thursday',
+    'Friday',
+    'Saturday',
+    'Sunday',
   ];
-  
+
   late String _selectedDay;
   Map<String, dynamic>? _fullMenu;
-  List<String> _userFavorites = [];
   bool _isLoading = true;
   String _errorMessage = '';
+  String _dietPreference = 'veg';
+  String _specialDinnerText = '';
+  Map<String, String> _mealTimings = {
+    'weekday_breakfast': '07:30-10:00',
+    'weekend_breakfast': '08:00-10:30',
+    'lunch': '12:15-14:45',
+    'snacks': '17:30-18:30',
+    'dinner': '19:30-22:30',
+  };
 
   @override
   void initState() {
     super.initState();
     _selectedDay = _getCurrentDay();
-    _loadMenu();
+    _bootstrap();
   }
 
   String _getCurrentDay() {
     return days[DateTime.now().weekday - 1];
   }
 
+  Future<void> _bootstrap() async {
+    final prefs = await SharedPreferences.getInstance();
+    final pref = prefs.getString('diet_preference');
+    if (pref == null) {
+      final selectedPref = await _askPreferenceOnFirstLaunch();
+      _dietPreference = selectedPref;
+      await prefs.setString('diet_preference', selectedPref);
+    } else {
+      _dietPreference = pref;
+    }
+    await _loadMenu();
+  }
+
+  Future<String> _askPreferenceOnFirstLaunch() async {
+    final selected = await showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Select your menu preference'),
+          content: const Text(
+            'You can change this anytime from the top-right toggle.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, 'veg'),
+              child: const Text('Veg'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context, 'nonveg'),
+              child: const Text('Non-Veg'),
+            ),
+          ],
+        );
+      },
+    );
+    return selected ?? 'veg';
+  }
+
   Future<void> _loadMenu() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final cachedMenu = prefs.getString('cached_menu');
-      final favMap = prefs.getStringList('favorite_items') ?? [];
-      
-      setState(() {
-         _userFavorites = favMap;
-      });
 
       if (cachedMenu != null) {
-        setState(() {
-          _fullMenu = json.decode(cachedMenu);
-          _isLoading = false;
-        });
-      } else {
-        await _fetchMenuFromApi();
+        final decoded = json.decode(cachedMenu);
+        if (decoded is Map<String, dynamic>) {
+          final cachedPref = (decoded['preference'] ?? 'veg').toString();
+          if (cachedPref == _dietPreference) {
+            _applyMenuPayload(decoded);
+            return;
+          }
+        }
       }
+
+      await _fetchMenuFromApi();
     } catch (e) {
-      // Fallback
       await _fetchMenuFromApi();
     }
+  }
+
+  void _applyMenuPayload(Map<String, dynamic> payload) {
+    final rawMenu = payload['menu'];
+    final menu = (rawMenu is Map<String, dynamic>) ? rawMenu : payload;
+    final config = payload['config'];
+
+    if (config is Map<String, dynamic>) {
+      final timingsRaw = config['timings'];
+      final specialRaw = config['special_dinner_text'];
+      if (timingsRaw is Map<String, dynamic>) {
+        setState(() {
+          _mealTimings = {
+            ..._mealTimings,
+            ...timingsRaw.map((k, v) => MapEntry(k, v.toString())),
+          };
+        });
+      }
+      if (specialRaw != null) {
+        setState(() {
+          _specialDinnerText = specialRaw.toString().trim();
+        });
+      }
+    }
+
+    setState(() {
+      _fullMenu = menu;
+      _isLoading = false;
+    });
+  }
+
+  Future<void> _savePreference(String pref) async {
+    if (_dietPreference == pref) return;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('diet_preference', pref);
+    setState(() {
+      _dietPreference = pref;
+    });
+    await _fetchMenuFromApi();
   }
 
   Future<void> _fetchMenuFromApi() async {
     setState(() => _isLoading = true);
     try {
-      // Using production Render URL
-      final String baseUrl = 'https://mess-backend-uydy.onrender.com/menu';
-      
-      final url = Uri.parse(baseUrl); 
+      final url = Uri.parse(
+        'https://mess-backend-uydy.onrender.com/menu?preference=$_dietPreference',
+      );
       final response = await http.get(url);
-      
+
       if (response.statusCode == 200) {
+        final payload = json.decode(response.body);
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('cached_menu', response.body);
-        setState(() {
-          _fullMenu = json.decode(response.body);
-          _isLoading = false;
-        });
+        if (payload is Map<String, dynamic>) {
+          _applyMenuPayload(payload);
+        } else {
+          setState(() {
+            _errorMessage = 'Unexpected API response format.';
+            _isLoading = false;
+          });
+        }
       } else {
         setState(() {
           _errorMessage = 'Failed to load menu';
@@ -112,13 +205,52 @@ class _HomeScreenState extends State<HomeScreen> {
     if (selectedDay != _getCurrentDay()) return false;
     final now = DateTime.now();
     final currentHour = now.hour + now.minute / 60.0;
-    
-    if (meal == 'breakfast' && currentHour >= 7.5 && currentHour < 10.0) return true;
-    if (meal == 'lunch' && currentHour >= 12.25 && currentHour < 14.75) return true;
-    if (meal == 'snacks' && currentHour >= 17.5 && currentHour < 18.5) return true;
-    if (meal == 'dinner' && currentHour >= 19.5 && currentHour < 22.5) return true;
-    
-    return false;
+    final isWeekend = selectedDay == 'Saturday' || selectedDay == 'Sunday';
+    final range = _getRangeForMeal(meal, isWeekend);
+    if (range == null) return false;
+    final start = _timeToDecimal(range.$1);
+    final end = _timeToDecimal(range.$2);
+    if (start == null || end == null) return false;
+    return currentHour >= start && currentHour < end;
+  }
+
+  (String, String)? _getRangeForMeal(String meal, bool isWeekend) {
+    final key = (meal == 'breakfast' && isWeekend)
+        ? 'weekend_breakfast'
+        : (meal == 'breakfast' ? 'weekday_breakfast' : meal);
+    final raw = _mealTimings[key];
+    if (raw == null || !raw.contains('-')) return null;
+    final parts = raw.split('-');
+    if (parts.length != 2) return null;
+    return (parts[0].trim(), parts[1].trim());
+  }
+
+  double? _timeToDecimal(String value) {
+    final parts = value.split(':');
+    if (parts.length != 2) return null;
+    final hour = int.tryParse(parts[0]);
+    final minute = int.tryParse(parts[1]);
+    if (hour == null || minute == null) return null;
+    return hour + minute / 60.0;
+  }
+
+  String _formatTimeTo12h(String value) {
+    final parts = value.split(':');
+    if (parts.length != 2) return value;
+    final h = int.tryParse(parts[0]);
+    final m = int.tryParse(parts[1]);
+    if (h == null || m == null) return value;
+    final suffix = h >= 12 ? 'PM' : 'AM';
+    final h12 = (h % 12 == 0) ? 12 : h % 12;
+    final mm = m.toString().padLeft(2, '0');
+    return '$h12:$mm $suffix';
+  }
+
+  String _getDisplayTimeRange(String meal) {
+    final isWeekend = _selectedDay == 'Saturday' || _selectedDay == 'Sunday';
+    final range = _getRangeForMeal(meal, isWeekend);
+    if (range == null) return '';
+    return '${_formatTimeTo12h(range.$1)} - ${_formatTimeTo12h(range.$2)}';
   }
 
   Widget _buildDaySelector() {
@@ -138,16 +270,16 @@ class _HomeScreenState extends State<HomeScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 0),
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: isSelected 
-                    ? Theme.of(context).colorScheme.primary 
+                color: isSelected
+                    ? Theme.of(context).colorScheme.primary
                     : Theme.of(context).colorScheme.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(24),
               ),
               child: Text(
                 days[index].substring(0, 3).toUpperCase(),
                 style: TextStyle(
-                  color: isSelected 
-                      ? Theme.of(context).colorScheme.onPrimary 
+                  color: isSelected
+                      ? Theme.of(context).colorScheme.onPrimary
                       : Theme.of(context).colorScheme.onSurfaceVariant,
                   fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
                 ),
@@ -170,18 +302,25 @@ class _HomeScreenState extends State<HomeScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Shimmer.fromColors(
-                baseColor: Theme.of(context).colorScheme.outlineVariant.withAlpha(20),
+                baseColor: Theme.of(
+                  context,
+                ).colorScheme.outlineVariant.withAlpha(20),
                 highlightColor: Theme.of(context).colorScheme.surface,
                 child: Container(
                   width: 16,
                   height: 16,
-                  decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                  ),
                 ),
               ),
               const SizedBox(width: 32),
               Expanded(
                 child: Shimmer.fromColors(
-                  baseColor: Theme.of(context).colorScheme.outlineVariant.withAlpha(20),
+                  baseColor: Theme.of(
+                    context,
+                  ).colorScheme.outlineVariant.withAlpha(20),
                   highlightColor: Theme.of(context).colorScheme.surface,
                   child: Container(
                     height: 120,
@@ -191,7 +330,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                 ),
-              )
+              ),
             ],
           ),
         );
@@ -206,14 +345,7 @@ class _HomeScreenState extends State<HomeScreen> {
         title: const Text('IITJ Menu'),
         centerTitle: false,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.star_outline_rounded),
-            onPressed: () {
-              FavoritesSheet.show(context).then((_) {
-                 _loadMenu();
-              });
-            },
-          ),
+          _buildPreferenceToggle(),
           const QRPassButton(),
           const SizedBox(width: 8),
         ],
@@ -221,22 +353,27 @@ class _HomeScreenState extends State<HomeScreen> {
       body: _isLoading
           ? _buildShimmerLoading()
           : _errorMessage.isNotEmpty
-              ? Center(child: Text(_errorMessage, style: const TextStyle(color: Colors.red)))
-              : RefreshIndicator(
-                  onRefresh: _fetchMenuFromApi,
-                  child: ListView(
-                    children: [
-                      const SizedBox(height: 8),
-                      // _buildHeroSection(), // Removed huge "UP NEXT" header card based on pure minimalistic layout requirement
-                      _buildDaySelector(),
-                      const SizedBox(height: 16),
-                      AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 300),
-                        child: _buildMealsList(key: ValueKey(_selectedDay)),
-                      ),
-                    ],
+          ? Center(
+              child: Text(
+                _errorMessage,
+                style: const TextStyle(color: Colors.red),
+              ),
+            )
+          : RefreshIndicator(
+              onRefresh: _fetchMenuFromApi,
+              child: ListView(
+                children: [
+                  const SizedBox(height: 8),
+                  // _buildHeroSection(), // Removed huge "UP NEXT" header card based on pure minimalistic layout requirement
+                  _buildDaySelector(),
+                  const SizedBox(height: 16),
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 300),
+                    child: _buildMealsList(key: ValueKey(_selectedDay)),
                   ),
-                ),
+                ],
+              ),
+            ),
     );
   }
 
@@ -248,7 +385,7 @@ class _HomeScreenState extends State<HomeScreen> {
         child: const Center(child: Text('No menu found for this day.')),
       );
     }
-    
+
     final dayMenu = _fullMenu![_selectedDay];
     final Map<String, dynamic> cMenu = {};
     dayMenu.forEach((k, v) => cMenu[k.toLowerCase()] = v);
@@ -258,23 +395,16 @@ class _HomeScreenState extends State<HomeScreen> {
       'breakfast': 'Breakfast',
       'lunch': 'Lunch',
       'snacks': 'Snacks',
-      'dinner': 'Dinner'
+      'dinner': 'Dinner',
     };
-    
+
     final colors = {
-      'breakfast': Colors.amber,          // Morning vibes
-      'lunch': Colors.teal,               // Fresh daytime
-      'snacks': Colors.deepOrangeAccent,  // Evening burst
-      'dinner': Colors.indigoAccent,      // Night time
+      'breakfast': Colors.amber, // Morning vibes
+      'lunch': Colors.teal, // Fresh daytime
+      'snacks': Colors.deepOrangeAccent, // Evening burst
+      'dinner': Colors.indigoAccent, // Night time
     };
-    
-    final times = {
-      'breakfast': '7:30 AM - 10:00 AM',
-      'lunch': '12:15 PM - 2:45 PM',
-      'snacks': '5:30 PM - 6:30 PM',
-      'dinner': '7:30 PM - 10:30 PM',
-    };
-    
+
     final meals = mealOrder.where((meal) => cMenu.containsKey(meal)).toList();
 
     return Padding(
@@ -285,16 +415,69 @@ class _HomeScreenState extends State<HomeScreen> {
           final int idx = entry.key;
           final String meal = entry.value;
           return MealCard(
-            mealName: displayNames[meal]!, 
+            mealName: displayNames[meal]!,
             mealDetails: cMenu[meal],
             isLast: idx == meals.length - 1,
             timelineColor: colors[meal] ?? Colors.grey,
-            timeRange: times[meal] ?? '',
+            timeRange: _getDisplayTimeRange(meal),
             isActive: _isMealActive(meal, _selectedDay),
+            preference: _dietPreference,
+            specialNote: meal == 'dinner' ? _specialDinnerText : '',
           );
         }).toList(),
       ),
     );
   }
-}
 
+  Widget _buildPreferenceToggle() {
+    Widget circle({
+      required String value,
+      required Color color,
+      required IconData icon,
+    }) {
+      final selected = _dietPreference == value;
+      return GestureDetector(
+        onTap: () => _savePreference(value),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 220),
+          width: 32,
+          height: 32,
+          margin: const EdgeInsets.symmetric(horizontal: 4),
+          decoration: BoxDecoration(
+            color: selected ? color : color.withAlpha(70),
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: selected ? color : color.withAlpha(130),
+              width: selected ? 2.2 : 1.2,
+            ),
+            boxShadow: selected
+                ? [
+                    BoxShadow(
+                      color: color.withAlpha(110),
+                      blurRadius: 8,
+                      spreadRadius: 1,
+                    ),
+                  ]
+                : null,
+          ),
+          child: Icon(icon, size: 18, color: Colors.white),
+        ),
+      );
+    }
+
+    return Row(
+      children: [
+        circle(
+          value: 'veg',
+          color: Colors.green.shade600,
+          icon: Icons.eco_rounded,
+        ),
+        circle(
+          value: 'nonveg',
+          color: Colors.red.shade600,
+          icon: Icons.set_meal_rounded,
+        ),
+      ],
+    );
+  }
+}

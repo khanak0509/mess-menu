@@ -7,17 +7,21 @@ import 'package:http/http.dart' as http;
 import 'home_screen.dart';
 import 'notification_service.dart';
 
-final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
+final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
+    FlutterLocalNotificationsPlugin();
 
 @pragma('vm:entry-point')
 void callbackDispatcher() {
   Workmanager().executeTask((task, inputData) async {
     try {
-      final url = Uri.parse('https://mess-backend-uydy.onrender.com/menu');
+      final prefs = await SharedPreferences.getInstance();
+      final pref = prefs.getString('diet_preference') ?? 'veg';
+      final url = Uri.parse(
+        'https://mess-backend-uydy.onrender.com/menu?preference=$pref',
+      );
       final response = await http.get(url);
-      
+
       if (response.statusCode == 200) {
-        final prefs = await SharedPreferences.getInstance();
         await prefs.setString('cached_menu', response.body);
 
         // Schedule new notifications after data update
@@ -34,17 +38,15 @@ void callbackDispatcher() {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   tz.initializeTimeZones();
-  
+
   await NotificationService().init();
   await NotificationService().requestPermissions();
   await NotificationService().scheduleDailyMealReminders();
 
-  Workmanager().initialize(
-    callbackDispatcher,
-  );
-  
+  Workmanager().initialize(callbackDispatcher);
+
   Workmanager().registerPeriodicTask(
     "1",
     "fetchMenuDaily",
@@ -117,4 +119,3 @@ class MessMenuApp extends StatelessWidget {
     );
   }
 }
-
