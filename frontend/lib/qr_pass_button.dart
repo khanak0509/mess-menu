@@ -23,37 +23,60 @@ class _QRPassButtonState extends State<QRPassButton> {
 
   Future<void> _loadSavedQR() async {
     final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      _savedQRPath = prefs.getString('local_qr_path');
-    });
+    final savedPath = prefs.getString('local_qr_path');
+    if (savedPath == null) {
+      if (mounted) {
+        setState(() {
+          _savedQRPath = null;
+        });
+      }
+      return;
+    }
+
+    final exists = await File(savedPath).exists();
+    if (!exists) {
+      await prefs.remove('local_qr_path');
+      if (mounted) {
+        setState(() {
+          _savedQRPath = null;
+        });
+      }
+      return;
+    }
+
+    if (mounted) {
+      setState(() {
+        _savedQRPath = savedPath;
+      });
+    }
   }
 
   Future<void> _pickAndSaveQR() async {
     if (_isProcessing) return;
     setState(() => _isProcessing = true);
-    
+
     try {
       final picker = ImagePicker();
       final pickedFile = await picker.pickImage(source: ImageSource.gallery);
-      
+
       if (pickedFile != null) {
         final directory = await getApplicationDocumentsDirectory();
         final String safePath = '${directory.path}/user_qr.png';
-        
+
         final File newImage = await File(pickedFile.path).copy(safePath);
-        
+
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('local_qr_path', newImage.path);
-        
+
         setState(() {
           _savedQRPath = newImage.path;
         });
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to pick QR: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to pick QR: $e')));
       }
     } finally {
       if (mounted) {
@@ -62,16 +85,48 @@ class _QRPassButtonState extends State<QRPassButton> {
     }
   }
 
-  void _showQRDialog() {
+  Future<void> _clearStaleQRPath() async {
+    final stalePath = _savedQRPath;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('local_qr_path');
+    if (mounted) {
+      setState(() {
+        _savedQRPath = null;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            stalePath == null
+                ? 'QR not found. Please upload again.'
+                : 'Saved QR file is missing. Please upload again.',
+          ),
+        ),
+      );
+    }
+  }
+
+  Future<void> _showQRDialog() async {
     if (_savedQRPath == null) return;
-    
+
+    final exists = await File(_savedQRPath!).exists();
+    if (!mounted) return;
+    if (!exists) {
+      await _clearStaleQRPath();
+      return;
+    }
+
     showDialog(
       context: context,
       builder: (context) {
         return Dialog(
-          insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+          insetPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 24,
+          ),
           backgroundColor: Theme.of(context).colorScheme.surface,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+          ),
           child: Padding(
             padding: const EdgeInsets.all(16.0),
             child: Column(
@@ -79,19 +134,13 @@ class _QRPassButtonState extends State<QRPassButton> {
               children: [
                 const Text(
                   'Your Mess QR',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 16),
                 Flexible(
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(16),
-                    child: Image.file(
-                      File(_savedQRPath!),
-                      fit: BoxFit.contain,
-                    ),
+                    child: Image.file(File(_savedQRPath!), fit: BoxFit.contain),
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -105,15 +154,15 @@ class _QRPassButtonState extends State<QRPassButton> {
                       onPressed: () async {
                         final prefs = await SharedPreferences.getInstance();
                         await prefs.remove('local_qr_path');
-                        
+
                         try {
                           await File(_savedQRPath!).delete();
-                        } catch(e) {
+                        } catch (e) {
                           // Ignore file delete error if file doesn't exist
                         }
 
                         if (!context.mounted) return;
-                        
+
                         setState(() {
                           _savedQRPath = null;
                         });
@@ -124,7 +173,9 @@ class _QRPassButtonState extends State<QRPassButton> {
                     ElevatedButton(
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Theme.of(context).colorScheme.primary,
-                        foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                        foregroundColor: Theme.of(
+                          context,
+                        ).colorScheme.onPrimary,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -152,18 +203,20 @@ class _QRPassButtonState extends State<QRPassButton> {
         child: const CircularProgressIndicator(strokeWidth: 2),
       );
     }
-    
+
     return IconButton(
-      onPressed: () {
+      onPressed: () async {
         if (_savedQRPath == null) {
-          _pickAndSaveQR();
+          await _pickAndSaveQR();
         } else {
-          _showQRDialog();
+          await _showQRDialog();
         }
       },
       icon: Icon(
         Icons.qr_code_2,
-        color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black87,
+        color: Theme.of(context).brightness == Brightness.dark
+            ? Colors.white
+            : Colors.black87,
       ),
     );
   }

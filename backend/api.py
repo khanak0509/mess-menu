@@ -10,6 +10,7 @@ import html
 
 app = FastAPI(title="IITJ Mess Menu API")
 
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -77,11 +78,18 @@ def _process_csv_to_menu(file_bytes: bytes):
         if current_day not in beautiful_menu:
             beautiful_menu[current_day] = {}
 
+        nonveg_value = ""
+        for candidate in ["NON-VEG", "NON VEG", "Non-Veg", "Non Veg", "NONVEG"]:
+            if candidate in mess_table.columns:
+                nonveg_value = _clean_cell(meal_row[candidate])
+                break
+
         beautiful_menu[current_day][current_meal] = {
             "Main": _clean_cell(meal_row["Unnamed: 2"]) if "Unnamed: 2" in mess_table.columns else "",
             "Complimentary": _clean_cell(meal_row["Complimentary items"]) if "Complimentary items" in mess_table.columns else "",
             "Compulsory": _clean_cell(meal_row["COMPULSORY ITEMS"]) if "COMPULSORY ITEMS" in mess_table.columns else "",
             "Jain": _clean_cell(meal_row["JAIN"]) if "JAIN" in mess_table.columns else "",
+            "NonVeg": nonveg_value,
         }
 
     return beautiful_menu
@@ -171,20 +179,20 @@ async def friendly_admin_dashboard():
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Mess Menu Admin</title>
         <style>
-            body { font-family: -apple-system, system-ui, sans-serif; background: #111318; color: #fff; margin: 0; padding: 30px 14px; }
-            .wrap { max-width: 960px; margin: 0 auto; display: grid; gap: 16px; }
-            .card { background: #1e1e1e; padding: 24px; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.35); border: 1px solid #333; }
-            h2, h3 { margin-top: 0; }
-            p { color: #bdbdbd; }
-            .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
-            label { display: block; font-size: 13px; color: #c8c8c8; margin-bottom: 6px; }
-            input[type="file"], input[type="text"], textarea { background: #2a2a2a; color: #fff; width: 100%; box-sizing: border-box; border: 1px solid #444; border-radius: 10px; padding: 12px; }
-            input[type="file"] { border-style: dashed; }
-            textarea { min-height: 100px; resize: vertical; }
-            button { background: #6200EE; color: white; border: none; padding: 12px 16px; border-radius: 10px; font-weight: bold; font-size: 14px; cursor: pointer; transition: 0.2s; width: 100%; margin-top: 10px; }
-            button:hover { background: #7C4DFF; transform: scale(1.01); }
-            .danger { background: #b00020; }
-            .danger:hover { background: #cf2746; }
+            body {{ font-family: -apple-system, system-ui, sans-serif; background: #111318; color: #fff; margin: 0; padding: 30px 14px; }}
+            .wrap {{ max-width: 960px; margin: 0 auto; display: grid; gap: 16px; }}
+            .card {{ background: #1e1e1e; padding: 24px; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.35); border: 1px solid #333; }}
+            h2, h3 {{ margin-top: 0; }}
+            p {{ color: #bdbdbd; }}
+            .grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }}
+            label {{ display: block; font-size: 13px; color: #c8c8c8; margin-bottom: 6px; }}
+            input[type="file"], input[type="text"], textarea {{ background: #2a2a2a; color: #fff; width: 100%; box-sizing: border-box; border: 1px solid #444; border-radius: 10px; padding: 12px; }}
+            input[type="file"] {{ border-style: dashed; }}
+            textarea {{ min-height: 100px; resize: vertical; }}
+            button {{ background: #6200EE; color: white; border: none; padding: 12px 16px; border-radius: 10px; font-weight: bold; font-size: 14px; cursor: pointer; transition: 0.2s; width: 100%; margin-top: 10px; }}
+            button:hover {{ background: #7C4DFF; transform: scale(1.01); }}
+            .danger {{ background: #b00020; }}
+            .danger:hover {{ background: #cf2746; }}
         </style>
     </head>
     <body>

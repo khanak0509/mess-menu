@@ -49,6 +49,12 @@ class MealCard extends StatelessWidget {
             .replaceAll(RegExp(r'\s{2,}'), ' ')
             .trim() ??
         '';
+    final nonVeg =
+        mealDetails['NonVeg']
+            ?.toString()
+            .replaceAll(RegExp(r'\s{2,}'), ' ')
+            .trim() ??
+        '';
 
     bool isValid(String text) {
       if (text.isEmpty) return false;
@@ -68,6 +74,9 @@ class MealCard extends StatelessWidget {
     if (isValid(mainText)) parts.add(mainText);
     if (isValid(complimentary)) parts.add(complimentary);
     if (isValid(compulsory)) parts.add(compulsory);
+    if (preference == 'nonveg' && isValid(nonVeg)) {
+      parts.add('Non-Veg: $nonVeg');
+    }
 
     final paragraphText = parts.join('\n').replaceAll(', ,', ',');
     final hasSpecialNote =
