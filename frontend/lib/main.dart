@@ -23,7 +23,6 @@ void callbackDispatcher() {
       if (response.statusCode == 200) {
         await prefs.setString('cached_menu_$pref', response.body);
 
-        // Schedule new notifications after data update
         await NotificationService().init();
         await NotificationService().scheduleDailyMealReminders();
         return Future.value(true);
@@ -68,7 +67,7 @@ class MessMenuApp extends StatelessWidget {
         brightness: Brightness.light,
         scaffoldBackgroundColor: const Color(0xFFFAFAFA),
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF1E1E1E), // Neutral premium slate
+          seedColor: const Color(0xFF1E1E1E),
           primary: const Color(0xFF1A1A1A),
           onPrimary: Colors.white,
           surface: Colors.white,
@@ -91,7 +90,7 @@ class MessMenuApp extends StatelessWidget {
       darkTheme: ThemeData(
         useMaterial3: true,
         brightness: Brightness.dark,
-        scaffoldBackgroundColor: const Color(0xFF000000), // Pure OLED black
+        scaffoldBackgroundColor: const Color(0xFF000000),
         colorScheme: ColorScheme.fromSeed(
           seedColor: Colors.white,
           primary: Colors.white,

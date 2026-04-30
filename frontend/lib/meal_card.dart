@@ -24,7 +24,6 @@ class MealCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Keep line breaks and original formatting from CSV. Let text flow naturally.
     final mainText =
         mealDetails['Main']
             ?.toString()
@@ -59,7 +58,6 @@ class MealCard extends StatelessWidget {
     bool isValid(String text) {
       if (text.isEmpty) return false;
       final t = text.toLowerCase();
-      // Filter out pandas NaN, nulls, and dashed empty placeholders from CSV
       if (t == 'nan' ||
           t == 'null' ||
           text == '—' ||
@@ -81,7 +79,6 @@ class MealCard extends StatelessWidget {
 
     final bool isDark = Theme.of(context).brightness == Brightness.dark;
 
-    // Non-veg block: indigo (distinct from veg green, not harsh red)
     final nonVegLabelColor = isDark
         ? const Color(0xFF9FA8DA)
         : const Color(0xFF3949AB);
@@ -89,7 +86,6 @@ class MealCard extends StatelessWidget {
         ? const Color(0xFFC5CAE9)
         : const Color(0xFF283593);
 
-    // Special dinner: soft violet (stands out without deepOrange clash)
     final specialBg = Color.alphaBlend(
       (isDark ? const Color(0xFF7E57C2) : const Color(0xFF5E35B1)).withAlpha(
         isDark ? 36 : 22,
@@ -107,10 +103,8 @@ class MealCard extends StatelessWidget {
         ? const Color(0xFFE1BEE7)
         : const Color(0xFF4A148C);
 
-    // Very subtle, minimal colors for modern aesthetic apps (like Instagram/YT aesthetics)
     final neutralLineColor = isDark ? Colors.white12 : Colors.black12;
 
-    // Highlight dynamically if meal is active now
     final neutralCardColor = isActive
         ? Color.alphaBlend(
             timelineColor.withAlpha(isDark ? 45 : 30),
@@ -137,7 +131,6 @@ class MealCard extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Timeline Column
           SizedBox(
             width: 48,
             child: Stack(
@@ -155,7 +148,7 @@ class MealCard extends StatelessWidget {
                     height: isActive ? 16 : 12,
                     width: isActive ? 16 : 12,
                     decoration: BoxDecoration(
-                      color: timelineColor, // elegant subtle accent
+                      color: timelineColor,
                       shape: BoxShape.circle,
                       border: Border.all(
                         color: isDark
@@ -187,7 +180,6 @@ class MealCard extends StatelessWidget {
             ),
           ),
 
-          // Card Content
           Expanded(
             child: Padding(
               padding: const EdgeInsets.only(
@@ -234,7 +226,6 @@ class MealCard extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Header Row
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             crossAxisAlignment: CrossAxisAlignment.center,
@@ -265,8 +256,7 @@ class MealCard extends StatelessWidget {
                                           vertical: 4,
                                         ),
                                         decoration: BoxDecoration(
-                                          color:
-                                              timelineColor, // Solid vibrant background
+                                          color: timelineColor,
                                           borderRadius: BorderRadius.circular(
                                             6,
                                           ),
@@ -433,7 +423,6 @@ class MealCard extends StatelessWidget {
                                     ),
                               ),
                           ],
-                          // Jain Option
                           if (!hasSpecialNote && isValid(jain))
                             Padding(
                               padding: const EdgeInsets.only(top: 16.0),

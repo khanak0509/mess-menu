@@ -169,7 +169,6 @@ class _HomeScreenState extends State<HomeScreen> {
               .trim();
         });
       } else if (config['special_dinner_text'] != null) {
-        // Backward compatibility for old config structure.
         setState(() {
           _specialDinnerDate = '';
           _specialDinnerVegText = (config['special_dinner_text'] ?? '')
@@ -242,6 +241,7 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+
   /*
   String _getUpNextMealName(Map<String, dynamic> dayMenu) {
     final now = DateTime.now();
@@ -258,7 +258,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return const SizedBox.shrink();
   }
   */
-
+  
   bool _isMealActive(String meal, String selectedDay) {
     if (selectedDay != _getCurrentDay()) return false;
     final now = DateTime.now();
@@ -507,10 +507,10 @@ class _HomeScreenState extends State<HomeScreen> {
     };
 
     final colors = {
-      'breakfast': Colors.amber, // Morning vibes
-      'lunch': Colors.teal, // Fresh daytime
-      'snacks': Colors.deepOrangeAccent, // Evening burst
-      'dinner': Colors.indigoAccent, // Night time
+      'breakfast': Colors.amber,
+      'lunch': Colors.teal,
+      'snacks': Colors.deepOrangeAccent,
+      'dinner': Colors.indigoAccent,
     };
 
     final meals = mealOrder.where((meal) => cMenu.containsKey(meal)).toList();
@@ -541,7 +541,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildPreferenceToggle() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    // Stronger than shade600, still clearly veg / non-veg
     const vegBold = Color(0xFF1B5E20);
     const nonVegBold = Color(0xFFB71C1C);
 

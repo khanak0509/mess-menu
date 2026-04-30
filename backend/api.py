@@ -19,7 +19,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Connect to our Firebase database (our little cloud brain)
 try:
     if not firebase_admin._apps:
         current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -116,7 +115,6 @@ def _get_config():
         **DEFAULT_CONFIG["special_dinner"],
         **raw_special,
     }
-    # Backward compatibility: old single text becomes veg special text.
     if raw.get("special_dinner_text") and not merged["special_dinner"]["veg_text"]:
         merged["special_dinner"]["veg_text"] = raw.get("special_dinner_text", "")
     return merged
@@ -168,7 +166,6 @@ async def get_menu_for_specific_day(day: str, preference: str = Query(default="v
                         "config": _get_config(),
                     }
             
-            # If we checked every day and found nothing...
             raise HTTPException(status_code=404, detail=f"We couldn't find anything to eat on {day}!")
         else:
             raise HTTPException(status_code=404, detail="The menu seems to be completely empty right now.")
