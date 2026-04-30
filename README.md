@@ -1,76 +1,57 @@
-# IITJ Mess Menu
+# Mess Menu App
 
-A full-stack mess menu system with:
+A simple full-stack menu management app with:
 
-- FastAPI backend (Firebase Firestore)
-- Flutter mobile app (Android/iOS)
-- Admin dashboard for uploading menus and updating timings
+- Flutter mobile app
+- FastAPI backend
+- Web admin dashboard for uploads and settings
 
-This project supports separate Veg and Non-Veg menus, first-time preference selection in app, configurable mess timings, and date-based special dinner highlights.
+## About
 
-## Highlights
-
-- Upload Veg and Non-Veg monthly CSV menus from dashboard
-- User selects Veg/Non-Veg on first launch (stored locally)
-- Preference can be changed anytime from app top bar toggle
-- Meal timings are configurable from dashboard and reflected in app
-- Special dinner can be set separately for Veg/Non-Veg with a specific date
-- Daily API fetch with local cache fallback in app
-
-## Project Structure
-
-```text
-mess/
-├── backend/              # FastAPI API + admin dashboard
-│   ├── api.py
-│   ├── requirements.txt
-│   └── admin.json        # Firebase service account (local only, keep secret)
-├── frontend/             # Flutter mobile app
-│   ├── lib/
-│   ├── android/
-│   ├── ios/
-│   └── pubspec.yaml
-└── README.md
-```
+This app lets users view daily meal menus with a Veg/Non-Veg preference.  
+Admins can upload menu CSV files, manage meal timings, and set special dinner notes.
 
 ## Tech Stack
 
-- Backend: FastAPI, Uvicorn, Pandas, Firebase Admin SDK, Firestore
-- Frontend: Flutter, SharedPreferences, HTTP, Workmanager, Local Notifications
-- Hosting: Render (backend)
+- **Frontend:** Flutter
+- **Backend:** FastAPI, Uvicorn
+- **Database:** Firebase Firestore (via Firebase Admin SDK)
+- **Hosting:** Render
 
-## Backend Setup (Local)
+## Key Features
 
-### 1) Create Python environment
+- Separate Veg and Non-Veg menu support
+- First-time preference selection in app
+- Preference toggle in app bar
+- Dashboard-based timing updates
+- Date-based special dinner support
+- Local cache fallback when API is unavailable
+
+## Local Setup
+
+### Backend
 
 ```bash
 cd backend
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
+python3 -m uvicorn api:app --reload --port 8000
 ```
 
-### 2) Firebase credentials
-
-Place your Firebase service account JSON at:
+Add Firebase credentials file at:
 
 ```text
 backend/admin.json
 ```
 
-### 3) Run backend
-
-```bash
-python3 -m uvicorn api:app --reload --port 8000
-```
-
-### 4) Open admin dashboard
+Admin dashboard:
 
 ```text
 http://127.0.0.1:8000/admin
 ```
 
-## Frontend Setup (Local)
+### Frontend
 
 ```bash
 cd frontend
@@ -80,86 +61,31 @@ flutter run
 
 ## Build APK
 
-Debug APK:
-
-```bash
-cd frontend
-flutter build apk --debug
-```
-
-Release APK:
-
 ```bash
 cd frontend
 flutter build apk --release
 ```
 
-Output path:
+Generated file:
 
 ```text
-frontend/build/app/outputs/flutter-apk/
+frontend/build/app/outputs/flutter-apk/app-release.apk
 ```
 
-## API Overview
-
-Base URL examples:
-
-- Local: `http://127.0.0.1:8000`
-- Render: `https://<your-service>.onrender.com`
-
-Important endpoints:
+## Main API Endpoints
 
 - `GET /menu?preference=veg|nonveg`
 - `GET /menu/{day}?preference=veg|nonveg`
 - `GET /config`
-- `GET /admin`
 - `POST /upload-csv/veg`
 - `POST /upload-csv/nonveg`
 - `POST /update-config`
 
-## CSV Upload Notes
+## Deployment Notes
 
-The parser supports typical mess CSV layouts and also handles Non-Veg column variants:
+For Render backend service:
 
-- `NON-VEG`
-- `NON VEG`
-- `Non-Veg`
-- `Non Veg`
-- `NONVEG`
-
-## Render Deploy (Backend)
-
-Create a new Web Service with:
-
-- Branch: `main`
 - Root Directory: `backend`
 - Build Command: `pip install -r requirements.txt`
 - Start Command: `uvicorn api:app --host 0.0.0.0 --port $PORT`
 
-Add secret file:
-
-- Filename: `admin.json`
-- Contents: Firebase service account JSON
-
-## Current App Behavior
-
-- If live API fails temporarily, app shows warning and uses cached menu
-- Veg and Non-Veg caches are stored separately
-- Special dinner is shown only for selected date and current day
-- After special date passes, normal dinner menu is shown automatically
-
-## Security Notes
-
-- Never commit `backend/admin.json` to git
-- Use Render Secret Files or environment-driven credential management
-
-## Future Improvements
-
-- Add admin auth for `/admin`
-- Add API health endpoint (`/health`)
-- Add CI checks for Flutter analyze + backend lint/tests
-- Add tests for CSV parser edge cases
-
----
-
-Built for IITJ mess operations with quick updates and student-friendly UX.
