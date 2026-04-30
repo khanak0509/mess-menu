@@ -89,3 +89,4 @@ For Render backend service:
 - Build Command: `pip install -r requirements.txt`
 - Start Command: `uvicorn api:app --host 0.0.0.0 --port $PORT`
 
+Built for IITJ mess operations with quick updates and student-friendly UX.
