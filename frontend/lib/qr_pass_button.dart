@@ -157,7 +157,9 @@ class _QRPassButtonState extends State<QRPassButton> {
 
                         try {
                           await File(_savedQRPath!).delete();
-                        } catch (e) {}
+                        } catch (e) {
+                          debugPrint('QR file delete skipped: $e');
+                        }
 
                         if (!context.mounted) return;
 

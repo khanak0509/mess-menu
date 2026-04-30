@@ -26,9 +26,9 @@ try:
         cred = credentials.Certificate(cred_path)
         firebase_admin.initialize_app(cred)
     db = firestore.client()
-    print("🌟 Firebase connected successfully!")
+    print("Firebase connected successfully.")
 except Exception as e:
-    print(f"💔 Oops! Something went wrong connecting to Firebase: {e}")
+    print(f"Firebase initialization failed: {e}")
     db = None
 
 MENU_COLLECTION = "mess_menu"
@@ -121,9 +121,9 @@ def _get_config():
 
 @app.get("/menu")
 async def get_entire_months_menu(preference: str = Query(default="veg")):
-    """Fetches the whole month's menu so we can display it all at once."""
+    """Return monthly menu for the selected preference."""
     if not db:
-        raise HTTPException(status_code=500, detail="Our database is taking a nap right now (not initialized)!")
+        raise HTTPException(status_code=500, detail="Database is not initialized.")
     
     try:
         pref = preference.lower()
@@ -138,15 +138,15 @@ async def get_entire_months_menu(preference: str = Query(default="veg")):
                 "config": _get_config(),
             }
         else:
-            raise HTTPException(status_code=404, detail="Hmm, we couldn't find the menu for this month.")
+            raise HTTPException(status_code=404, detail="Menu not found for this month.")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/menu/{day}")
 async def get_menu_for_specific_day(day: str, preference: str = Query(default="veg")):
-    """Fetches the menu just for the day you asked about."""
+    """Return menu for a specific day and preference."""
     if not db:
-        raise HTTPException(status_code=500, detail="Our database is taking a nap right now (not initialized)!")
+        raise HTTPException(status_code=500, detail="Database is not initialized.")
     
     try:
         pref = preference.lower()
@@ -166,15 +166,15 @@ async def get_menu_for_specific_day(day: str, preference: str = Query(default="v
                         "config": _get_config(),
                     }
             
-            raise HTTPException(status_code=404, detail=f"We couldn't find anything to eat on {day}!")
+            raise HTTPException(status_code=404, detail=f"Menu not found for {day}.")
         else:
-            raise HTTPException(status_code=404, detail="The menu seems to be completely empty right now.")
+            raise HTTPException(status_code=404, detail="Menu data is empty.")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/admin", response_class=HTMLResponse)
 async def friendly_admin_dashboard():
-    """Provides a beautiful, easy-to-use webpage for uploading the new monthly menu."""
+    """Render admin dashboard."""
     config = _get_config()
     timings = config["timings"]
     special = config.get("special_dinner", {})
@@ -280,9 +280,9 @@ async def friendly_admin_dashboard():
 
 @app.post("/upload-csv/{menu_type}")
 async def upload_csv_by_menu_type(menu_type: str, file: UploadFile = File(...)):
-    """Receives the incoming CSV, cleans it up nicely, and saves it neatly in Firebase!"""
+    """Upload CSV and store parsed menu in Firestore."""
     if not db:
-        raise HTTPException(status_code=500, detail="Uh oh, our database connection is broken.")
+        raise HTTPException(status_code=500, detail="Database is not initialized.")
     
     try:
         file_bytes = await file.read()
@@ -306,7 +306,7 @@ async def upload_csv_by_menu_type(menu_type: str, file: UploadFile = File(...)):
         return HTMLResponse(content=success_page)
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Oops, we hit a snag reading that CSV: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to process CSV: {str(e)}")
 
 
 @app.post("/upload-csv")
@@ -317,7 +317,7 @@ async def upload_default_veg_csv(file: UploadFile = File(...)):
 @app.get("/config")
 async def get_app_config():
     if not db:
-        raise HTTPException(status_code=500, detail="Our database is taking a nap right now (not initialized)!")
+        raise HTTPException(status_code=500, detail="Database is not initialized.")
     return _get_config()
 
 
@@ -333,7 +333,7 @@ async def update_config(
     special_dinner_nonveg_text: str = Form(default=""),
 ):
     if not db:
-        raise HTTPException(status_code=500, detail="Our database is taking a nap right now (not initialized)!")
+        raise HTTPException(status_code=500, detail="Database is not initialized.")
 
     new_config = {
         "timings": {
