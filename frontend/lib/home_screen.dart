@@ -14,7 +14,7 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   static const String _apiBaseUrl = 'https://mess-menu-v458.onrender.com';
   final List<String> days = const [
     'Monday',
@@ -39,6 +39,7 @@ class _HomeScreenState extends State<HomeScreen> {
   };
   Map<String, dynamic>? _fullMenu;
   bool _isLoading = true;
+  bool _didInitialDayScrollAfterLoad = false;
   String _errorMessage = '';
   String _dietPreference = 'veg';
   String _specialDinnerDate = '';
@@ -55,6 +56,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _selectedDay = _getCurrentDay();
     _scrollToSelectedDay();
     _bootstrap();
@@ -62,8 +64,20 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _dayScrollController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      final today = _getCurrentDay();
+      if (_selectedDay != today) {
+        setState(() => _selectedDay = today);
+      }
+      _scrollToSelectedDay(animate: true);
+    }
   }
 
   String _getCurrentDay() {
@@ -215,6 +229,11 @@ class _HomeScreenState extends State<HomeScreen> {
       _fullMenu = menu;
       _isLoading = false;
     });
+
+    if (!_didInitialDayScrollAfterLoad) {
+      _didInitialDayScrollAfterLoad = true;
+      _scrollToSelectedDay(animate: false);
+    }
   }
 
   Future<void> _savePreference(String pref) async {
