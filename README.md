@@ -11,6 +11,12 @@ A simple full-stack menu management app with:
 This app lets users view daily meal menus with a Veg/Non-Veg preference.  
 Admins can upload menu CSV files, manage meal timings, and set special dinner notes.
 
+## Live Links
+
+- APK Download: [app-debug.apk](https://github.com/khanak0509/mess-menu/releases/download/v1/app-debug.apk)
+- Live Backend: [https://mess-menu-v458.onrender.com](https://mess-menu-v458.onrender.com)
+- Live Admin Dashboard: [https://mess-menu-v458.onrender.com/admin](https://mess-menu-v458.onrender.com/admin)
+
 ## Tech Stack
 
 - **Frontend:** Flutter

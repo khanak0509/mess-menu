@@ -27,6 +27,7 @@ class _HomeScreenState extends State<HomeScreen> {
   ];
 
   late String _selectedDay;
+  final ScrollController _dayScrollController = ScrollController();
   Map<String, dynamic>? _fullMenu;
   bool _isLoading = true;
   String _errorMessage = '';
@@ -46,11 +47,42 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _selectedDay = _getCurrentDay();
+    _scrollToSelectedDay();
     _bootstrap();
+  }
+
+  @override
+  void dispose() {
+    _dayScrollController.dispose();
+    super.dispose();
   }
 
   String _getCurrentDay() {
     return days[DateTime.now().weekday - 1];
+  }
+
+  void _scrollToSelectedDay({bool animate = false}) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_dayScrollController.hasClients) return;
+      final index = days.indexOf(_selectedDay);
+      if (index < 0) return;
+
+      const estimatedItemWidth = 92.0;
+      final targetOffset = (index * estimatedItemWidth).clamp(
+        0.0,
+        _dayScrollController.position.maxScrollExtent,
+      );
+
+      if (animate) {
+        _dayScrollController.animateTo(
+          targetOffset,
+          duration: const Duration(milliseconds: 280),
+          curve: Curves.easeOutCubic,
+        );
+      } else {
+        _dayScrollController.jumpTo(targetOffset);
+      }
+    });
   }
 
   Future<void> _bootstrap() async {
@@ -241,7 +273,6 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-
   /*
   String _getUpNextMealName(Map<String, dynamic> dayMenu) {
     final now = DateTime.now();
@@ -258,7 +289,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return const SizedBox.shrink();
   }
   */
-  
+
   bool _isMealActive(String meal, String selectedDay) {
     if (selectedDay != _getCurrentDay()) return false;
     final now = DateTime.now();
@@ -333,13 +364,17 @@ class _HomeScreenState extends State<HomeScreen> {
     return SizedBox(
       height: 48,
       child: ListView.builder(
+        controller: _dayScrollController,
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16),
         itemCount: days.length,
         itemBuilder: (context, index) {
           final isSelected = days[index] == _selectedDay;
           return GestureDetector(
-            onTap: () => setState(() => _selectedDay = days[index]),
+            onTap: () {
+              setState(() => _selectedDay = days[index]);
+              _scrollToSelectedDay(animate: true);
+            },
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 200),
               margin: const EdgeInsets.only(right: 12),
@@ -550,9 +585,7 @@ class _HomeScreenState extends State<HomeScreen> {
       required IconData icon,
     }) {
       final selected = _dietPreference == value;
-      final fill = selected
-          ? color
-          : color.withAlpha(isDark ? 130 : 105);
+      final fill = selected ? color : color.withAlpha(isDark ? 130 : 105);
       final borderColor = selected ? color : color.withAlpha(220);
       return GestureDetector(
         onTap: () => _savePreference(value),
@@ -584,7 +617,11 @@ class _HomeScreenState extends State<HomeScreen> {
       mainAxisSize: MainAxisSize.min,
       children: [
         circle(value: 'veg', color: vegBold, icon: Icons.eco_rounded),
-        circle(value: 'nonveg', color: nonVegBold, icon: Icons.set_meal_rounded),
+        circle(
+          value: 'nonveg',
+          color: nonVegBold,
+          icon: Icons.set_meal_rounded,
+        ),
       ],
     );
   }
