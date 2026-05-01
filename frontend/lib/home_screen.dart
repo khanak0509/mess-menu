@@ -28,6 +28,15 @@ class _HomeScreenState extends State<HomeScreen> {
 
   late String _selectedDay;
   final ScrollController _dayScrollController = ScrollController();
+  final Map<String, GlobalKey> _dayItemKeys = {
+    'Monday': GlobalKey(),
+    'Tuesday': GlobalKey(),
+    'Wednesday': GlobalKey(),
+    'Thursday': GlobalKey(),
+    'Friday': GlobalKey(),
+    'Saturday': GlobalKey(),
+    'Sunday': GlobalKey(),
+  };
   Map<String, dynamic>? _fullMenu;
   bool _isLoading = true;
   String _errorMessage = '';
@@ -63,25 +72,16 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _scrollToSelectedDay({bool animate = false}) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!_dayScrollController.hasClients) return;
-      final index = days.indexOf(_selectedDay);
-      if (index < 0) return;
+      final dayKey = _dayItemKeys[_selectedDay];
+      final dayContext = dayKey?.currentContext;
+      if (dayContext == null) return;
 
-      const estimatedItemWidth = 92.0;
-      final targetOffset = (index * estimatedItemWidth).clamp(
-        0.0,
-        _dayScrollController.position.maxScrollExtent,
+      Scrollable.ensureVisible(
+        dayContext,
+        alignment: 0.5,
+        duration: animate ? const Duration(milliseconds: 280) : Duration.zero,
+        curve: Curves.easeOutCubic,
       );
-
-      if (animate) {
-        _dayScrollController.animateTo(
-          targetOffset,
-          duration: const Duration(milliseconds: 280),
-          curve: Curves.easeOutCubic,
-        );
-      } else {
-        _dayScrollController.jumpTo(targetOffset);
-      }
     });
   }
 
@@ -376,6 +376,7 @@ class _HomeScreenState extends State<HomeScreen> {
               _scrollToSelectedDay(animate: true);
             },
             child: AnimatedContainer(
+              key: _dayItemKeys[days[index]],
               duration: const Duration(milliseconds: 200),
               margin: const EdgeInsets.only(right: 12),
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 0),
