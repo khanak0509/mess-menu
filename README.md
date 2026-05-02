@@ -13,7 +13,7 @@ Admins can upload menu CSV files, manage meal timings, and set special dinner no
 
 ## Live Links
 
-- APK Download: [app-debug.apk](https://github.com/khanak0509/mess-menu/releases/download/v1/app-debug.apk)
+- APK Download: [app-debug.apk]([https://github.com/khanak0509/mess-menu/releases/download/v1/app-debug.apk](https://github.com/khanak0509/mess-menu/releases/download/v1/IITJ.menu))
 ## Tech Stack
 
 - **Frontend:** Flutter
