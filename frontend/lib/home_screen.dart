@@ -556,13 +556,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         ? _examNote.trim()
         : 'Exam schedule — breakfast time/menu changed';
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 4),
       child: Container(
         width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
           color: Colors.indigo.withAlpha(28),
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(12),
           border: Border.all(color: Colors.indigo.withAlpha(90)),
         ),
         child: Text(
@@ -571,8 +571,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             color: Theme.of(context).brightness == Brightness.dark
                 ? Colors.indigo.shade100
                 : Colors.indigo.shade900,
-            fontSize: 12.5,
+            fontSize: 13,
             fontWeight: FontWeight.w600,
+            height: 1.35,
           ),
         ),
       ),
