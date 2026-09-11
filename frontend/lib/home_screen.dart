@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -43,7 +42,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Map<String, dynamic>? _fullMenu;
   bool _isLoading = true;
   bool _didInitialDayScrollAfterLoad = false;
-  int? _sessionDismissedUpdateBuild;
+  bool _sessionDismissedUpdate = false;
   String _errorMessage = '';
   String _dietPreference = 'veg';
   String _specialDinnerDate = '';
@@ -360,38 +359,25 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Future<void> _maybeShowUpdateDialog() async {
     final update = _pendingAppUpdate;
     if (update == null || !mounted) return;
+    if (_sessionDismissedUpdate) return;
 
-    final remoteBuild = int.tryParse('${update['latest_build']}') ?? 0;
     final apkUrl = (update['apk_url'] ?? '').toString().trim();
-    if (remoteBuild <= 0 || apkUrl.isEmpty) return;
-
-    final info = await PackageInfo.fromPlatform();
-    final localBuild = int.tryParse(info.buildNumber) ?? 0;
-    if (remoteBuild <= localBuild) return;
-
-    // "Later" only hides for this app session.
-    if (_sessionDismissedUpdateBuild == remoteBuild) return;
+    final message = (update['message'] ?? '').toString().trim();
+    // Show only when both note + link are set (admin clears them to hide).
+    if (apkUrl.isEmpty || message.isEmpty) return;
 
     if (!mounted) return;
-    final versionName = (update['latest_version'] ?? '').toString();
-    final message = (update['message'] ?? '').toString().trim();
 
     await showDialog<void>(
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
           title: const Text('Update available'),
-          content: Text(
-            [
-              if (versionName.isNotEmpty) 'Version $versionName is available.',
-              if (message.isNotEmpty) message,
-              'Download the latest APK from GitHub.',
-            ].where((line) => line.isNotEmpty).join('\n\n'),
-          ),
+          content: Text(message),
           actions: [
             TextButton(
               onPressed: () {
-                _sessionDismissedUpdateBuild = remoteBuild;
+                _sessionDismissedUpdate = true;
                 Navigator.of(dialogContext).pop();
               },
               child: const Text('Later'),

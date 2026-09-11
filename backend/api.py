@@ -61,9 +61,7 @@ DEFAULT_CONFIG = {
         "breakfasts_raw": "",
     },
     "app_update": {
-        "latest_version": "1.0.0",
-        "latest_build": 1,
-        "apk_url": "https://github.com/khanak0509/mess-menu/releases/download/v1/IITJ.menu",
+        "apk_url": "",
         "message": "",
     },
 }
@@ -264,8 +262,14 @@ def _get_config():
             **(raw.get("exam_schedule") or {}),
         },
         "app_update": {
-            **DEFAULT_CONFIG["app_update"],
-            **(raw.get("app_update") or {}),
+            "apk_url": str(
+                (raw.get("app_update") or {}).get("apk_url")
+                or DEFAULT_CONFIG["app_update"]["apk_url"]
+            ).strip(),
+            "message": str(
+                (raw.get("app_update") or {}).get("message")
+                or DEFAULT_CONFIG["app_update"]["message"]
+            ).strip(),
         },
     }
     if raw.get("special_dinner_text") and not merged["special_dinner"]["veg_text"]:
@@ -278,13 +282,6 @@ def _get_config():
         str(k): str(v) for k, v in breakfasts.items() if str(v).strip()
     }
 
-    try:
-        merged["app_update"]["latest_build"] = int(
-            merged["app_update"].get("latest_build") or 1
-        )
-    except (TypeError, ValueError):
-        merged["app_update"]["latest_build"] = 1
-
     return merged
 
 
@@ -292,7 +289,13 @@ def _save_config(partial: dict):
     """Merge partial config into existing Firestore config and save."""
     current = _get_config()
     for key, value in partial.items():
-        if isinstance(value, dict) and isinstance(current.get(key), dict):
+        if key == "app_update" and isinstance(value, dict):
+            # Replace fully so old version/build fields are dropped.
+            current[key] = {
+                "apk_url": str(value.get("apk_url", "")).strip(),
+                "message": str(value.get("message", "")).strip(),
+            }
+        elif isinstance(value, dict) and isinstance(current.get(key), dict):
             current[key] = {**current[key], **value}
         else:
             current[key] = value
@@ -507,28 +510,18 @@ async def friendly_admin_dashboard():
             </div>
 
             <div class="card">
-                <h3>App Update (GitHub APK)</h3>
-                <p>After you upload a new APK to GitHub Releases, set the version here. The app will show “Update available” and open the download link.</p>
+                <h3>App Update Notice</h3>
+                <p>Optional. Fill both fields to show a simple update popup in the app. Clear them to hide it.</p>
                 <form action="/update-app-version" method="post">
-                    <div class="grid">
-                        <div>
-                            <label>Latest Version Name</label>
-                            <input type="text" name="latest_version" value="{html.escape(str(app_update.get('latest_version', '')))}" placeholder="1.1.0" required>
-                        </div>
-                        <div>
-                            <label>Latest Build Number</label>
-                            <input type="number" name="latest_build" value="{html.escape(str(app_update.get('latest_build', 1)))}" min="1" required>
-                        </div>
+                    <div style="margin-top:14px;">
+                        <label>Note</label>
+                        <textarea name="update_message" placeholder="New APK ready — please download">{html.escape(str(app_update.get('message', '')))}</textarea>
                     </div>
                     <div style="margin-top:14px;">
-                        <label>APK Download URL</label>
-                        <input type="text" name="apk_url" value="{html.escape(str(app_update.get('apk_url', '')))}" placeholder="https://github.com/khanak0509/mess-menu/releases/download/..." required>
+                        <label>Download link</label>
+                        <input type="text" name="apk_url" value="{html.escape(str(app_update.get('apk_url', '')))}" placeholder="https://github.com/khanak0509/mess-menu/releases/...">
                     </div>
-                    <div style="margin-top:14px;">
-                        <label>Update Message</label>
-                        <textarea name="update_message" placeholder="Exam schedule support and bug fixes">{html.escape(str(app_update.get('message', '')))}</textarea>
-                    </div>
-                    <button type="submit">Publish Update Info</button>
+                    <button type="submit">Save Update Notice</button>
                 </form>
             </div>
         </div>
@@ -661,9 +654,7 @@ async def update_exam_schedule(
 
 @app.post("/update-app-version")
 async def update_app_version(
-    latest_version: str = Form(...),
-    latest_build: int = Form(...),
-    apk_url: str = Form(...),
+    apk_url: str = Form(default=""),
     update_message: str = Form(default=""),
 ):
     if not db:
@@ -672,14 +663,15 @@ async def update_app_version(
     _save_config(
         {
             "app_update": {
-                "latest_version": latest_version.strip(),
-                "latest_build": int(latest_build),
                 "apk_url": apk_url.strip(),
                 "message": update_message.strip(),
             }
         }
     )
+    has_notice = bool(apk_url.strip() and update_message.strip())
     return _success_html(
-        "Update published!",
-        "Users with an older build will see an update prompt that opens your GitHub APK link.",
+        "Saved!",
+        "Update notice is on in the app."
+        if has_notice
+        else "Update notice cleared — app will not show a popup.",
     )
