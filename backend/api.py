@@ -7,6 +7,8 @@ import pandas as pd
 import io
 import os
 import html
+import re
+from datetime import datetime
 
 app = FastAPI(title="IITJ Mess Menu API")
 
@@ -50,6 +52,47 @@ DEFAULT_CONFIG = {
         "veg_text": "",
         "nonveg_text": "",
     },
+    "exam_schedule": {
+        "start_date": "",
+        "end_date": "",
+        "breakfast_time": "",
+        "note": "",
+        "breakfasts": {},
+        "breakfasts_raw": "",
+    },
+    "app_update": {
+        "latest_version": "1.0.0",
+        "latest_build": 1,
+        "apk_url": "https://github.com/khanak0509/mess-menu/releases/download/v1/IITJ.menu",
+        "message": "",
+    },
+}
+
+_MONTH_LOOKUP = {
+    "january": 1,
+    "jan": 1,
+    "february": 2,
+    "feb": 2,
+    "march": 3,
+    "mar": 3,
+    "april": 4,
+    "apr": 4,
+    "may": 5,
+    "june": 6,
+    "jun": 6,
+    "july": 7,
+    "jul": 7,
+    "august": 8,
+    "aug": 8,
+    "september": 9,
+    "sept": 9,
+    "sep": 9,
+    "october": 10,
+    "oct": 10,
+    "november": 11,
+    "nov": 11,
+    "december": 12,
+    "dec": 12,
 }
 
 
@@ -74,6 +117,76 @@ def _find_column(columns, *candidates):
         if key in normalized:
             return normalized[key]
     return None
+
+
+def _iso_date(year: int, month: int, day: int) -> str:
+    return f"{year:04d}-{month:02d}-{day:02d}"
+
+
+def _parse_exam_breakfasts(raw_text: str, default_year=None) -> dict:
+    """Parse vendor-mail style lines into {YYYY-MM-DD: breakfast item}."""
+    year = default_year or datetime.now().year
+    breakfasts = {}
+    for raw_line in (raw_text or "").splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        lower = line.lower()
+        if lower.startswith("date") and "breakfast" in lower:
+            continue
+        if lower in {"date", "breakfast"}:
+            continue
+
+        m = re.match(
+            r"^(\d{4})-(\d{1,2})-(\d{1,2})\s*[|\-–—:]\s*(.+)$",
+            line,
+        )
+        if m:
+            y, mo, d, item = m.groups()
+            breakfasts[_iso_date(int(y), int(mo), int(d))] = item.strip()
+            continue
+
+        m = re.match(
+            r"^(\d{1,2})[/-](\d{1,2})(?:[/-](\d{2,4}))?\s*[|\-–—:]\s*(.+)$",
+            line,
+        )
+        if m:
+            d, mo, y, item = m.groups()
+            y_int = int(y) if y else year
+            if y_int < 100:
+                y_int += 2000
+            breakfasts[_iso_date(y_int, int(mo), int(d))] = item.strip()
+            continue
+
+        m = re.match(
+            r"^(\d{1,2})\s+([A-Za-z]+)\.?\s*(\d{4})?\s*[|\-–—:\t]+\s*(.+)$",
+            line,
+        )
+        if m:
+            d, mon, y, item = m.groups()
+            mo = _MONTH_LOOKUP.get(mon.lower())
+            if mo:
+                y_int = int(y) if y else year
+                breakfasts[_iso_date(y_int, mo, int(d))] = item.strip()
+            continue
+
+        # "15 September Idli & Fried Idli" (single spaces)
+        m = re.match(r"^(\d{1,2})\s+([A-Za-z]+)\.?\s+(\d{4})\s+(.+)$", line)
+        if m:
+            d, mon, y, item = m.groups()
+            mo = _MONTH_LOOKUP.get(mon.lower())
+            if mo:
+                breakfasts[_iso_date(int(y), mo, int(d))] = item.strip()
+            continue
+
+        m = re.match(r"^(\d{1,2})\s+([A-Za-z]+)\.?\s+(.+)$", line)
+        if m:
+            d, mon, item = m.groups()
+            mo = _MONTH_LOOKUP.get(mon.lower())
+            if mo and item.strip():
+                breakfasts[_iso_date(year, mo, int(d))] = item.strip()
+
+    return breakfasts
 
 
 def _process_csv_to_menu(file_bytes: bytes):
@@ -136,18 +249,68 @@ def _get_config():
         doc_ref.set(DEFAULT_CONFIG)
         return DEFAULT_CONFIG
 
-    merged = DEFAULT_CONFIG.copy()
     raw = config_doc.to_dict() or {}
-    merged["timings"] = {**DEFAULT_CONFIG["timings"], **(raw.get("timings") or {})}
-    raw_special = raw.get("special_dinner") or {}
-    merged["special_dinner"] = {
-        **DEFAULT_CONFIG["special_dinner"],
-        **raw_special,
+    merged = {
+        "timings": {
+            **DEFAULT_CONFIG["timings"],
+            **(raw.get("timings") or {}),
+        },
+        "special_dinner": {
+            **DEFAULT_CONFIG["special_dinner"],
+            **(raw.get("special_dinner") or {}),
+        },
+        "exam_schedule": {
+            **DEFAULT_CONFIG["exam_schedule"],
+            **(raw.get("exam_schedule") or {}),
+        },
+        "app_update": {
+            **DEFAULT_CONFIG["app_update"],
+            **(raw.get("app_update") or {}),
+        },
     }
     if raw.get("special_dinner_text") and not merged["special_dinner"]["veg_text"]:
         merged["special_dinner"]["veg_text"] = raw.get("special_dinner_text", "")
+
+    breakfasts = merged["exam_schedule"].get("breakfasts") or {}
+    if not isinstance(breakfasts, dict):
+        breakfasts = {}
+    merged["exam_schedule"]["breakfasts"] = {
+        str(k): str(v) for k, v in breakfasts.items() if str(v).strip()
+    }
+
+    try:
+        merged["app_update"]["latest_build"] = int(
+            merged["app_update"].get("latest_build") or 1
+        )
+    except (TypeError, ValueError):
+        merged["app_update"]["latest_build"] = 1
+
     return merged
 
+
+def _save_config(partial: dict):
+    """Merge partial config into existing Firestore config and save."""
+    current = _get_config()
+    for key, value in partial.items():
+        if isinstance(value, dict) and isinstance(current.get(key), dict):
+            current[key] = {**current[key], **value}
+        else:
+            current[key] = value
+    db.collection(CONFIG_COLLECTION).document(CONFIG_DOC).set(current)
+    return current
+
+
+def _success_html(title: str, message: str) -> HTMLResponse:
+    return HTMLResponse(
+        content=f"""
+        <body style="background:#111318;color:white;font-family:sans-serif;text-align:center;padding-top:100px;">
+            <h1 style="font-size:40px;">{html.escape(title)}</h1>
+            <p style="font-size:18px;color:#ccc;max-width:500px;margin:auto;">{html.escape(message)}</p>
+            <br><br>
+            <a href="/admin" style="background:#6200EE;color:white;padding:14px 28px;border-radius:10px;text-decoration:none;font-weight:bold;transition:0.2s;">← Back to Dashboard</a>
+        </body>
+        """
+    )
 @app.get("/menu")
 async def get_entire_months_menu(preference: str = Query(default="veg")):
     """Return monthly menu for the selected preference."""
@@ -207,9 +370,16 @@ async def friendly_admin_dashboard():
     config = _get_config()
     timings = config["timings"]
     special = config.get("special_dinner", {})
+    exam = config.get("exam_schedule", {})
+    app_update = config.get("app_update", {})
     special_date = special.get("date", "")
     special_veg_text = special.get("veg_text", "")
     special_nonveg_text = special.get("nonveg_text", "")
+    exam_breakfasts_raw = exam.get("breakfasts_raw", "")
+    if not exam_breakfasts_raw and exam.get("breakfasts"):
+        exam_breakfasts_raw = "\n".join(
+            f"{date} | {item}" for date, item in sorted(exam["breakfasts"].items())
+        )
 
     html_content = f"""
     <!DOCTYPE html>
@@ -226,20 +396,22 @@ async def friendly_admin_dashboard():
             p {{ color: #bdbdbd; }}
             .grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }}
             label {{ display: block; font-size: 13px; color: #c8c8c8; margin-bottom: 6px; }}
-            input[type="file"], input[type="text"], textarea {{ background: #2a2a2a; color: #fff; width: 100%; box-sizing: border-box; border: 1px solid #444; border-radius: 10px; padding: 12px; }}
+            input[type="file"], input[type="text"], input[type="number"], textarea {{ background: #2a2a2a; color: #fff; width: 100%; box-sizing: border-box; border: 1px solid #444; border-radius: 10px; padding: 12px; }}
             input[type="file"] {{ border-style: dashed; }}
             textarea {{ min-height: 100px; resize: vertical; }}
+            textarea.tall {{ min-height: 160px; }}
             button {{ background: #6200EE; color: white; border: none; padding: 12px 16px; border-radius: 10px; font-weight: bold; font-size: 14px; cursor: pointer; transition: 0.2s; width: 100%; margin-top: 10px; }}
             button:hover {{ background: #7C4DFF; transform: scale(1.01); }}
             .danger {{ background: #b00020; }}
             .danger:hover {{ background: #cf2746; }}
+            code {{ background:#2a2a2a; padding:2px 6px; border-radius:6px; }}
         </style>
     </head>
     <body>
         <div class="wrap">
             <div class="card">
                 <h2>Mess Dashboard</h2>
-                <p>Upload Veg/Non-Veg menus, update meal timings, and set a special dinner note.</p>
+                <p>Upload menus, set timings, paste exam breakfast changes, and publish app updates.</p>
             </div>
 
             <div class="grid">
@@ -301,6 +473,64 @@ async def friendly_admin_dashboard():
                     <button type="submit">Save App Settings</button>
                 </form>
             </div>
+
+            <div class="card">
+                <h3>Exam Breakfast Schedule</h3>
+                <p>Paste the vendor mail list (one day per line). No CSV needed. Example:</p>
+                <p><code>15 September  Idli &amp; Fried Idli</code><br>
+                <code>16 September  Poha</code></p>
+                <form action="/update-exam-schedule" method="post">
+                    <div class="grid">
+                        <div>
+                            <label>Start Date (YYYY-MM-DD)</label>
+                            <input type="text" name="exam_start_date" value="{html.escape(exam.get('start_date', ''))}" placeholder="2026-09-15">
+                        </div>
+                        <div>
+                            <label>End Date (YYYY-MM-DD)</label>
+                            <input type="text" name="exam_end_date" value="{html.escape(exam.get('end_date', ''))}" placeholder="2026-09-20">
+                        </div>
+                        <div>
+                            <label>Exam Breakfast Time (HH:MM-HH:MM)</label>
+                            <input type="text" name="exam_breakfast_time" value="{html.escape(exam.get('breakfast_time', ''))}" placeholder="07:00-09:00">
+                        </div>
+                    </div>
+                    <div style="margin-top:14px;">
+                        <label>Note (shown as banner in app)</label>
+                        <input type="text" name="exam_note" value="{html.escape(exam.get('note', ''))}" placeholder="Minor exam schedule — breakfast changed">
+                    </div>
+                    <div style="margin-top:14px;">
+                        <label>Breakfast list (paste from mail)</label>
+                        <textarea class="tall" name="exam_breakfasts_raw" placeholder="15 September  Idli & Fried Idli&#10;16 September  Poha&#10;17 September  Suji Upma & Daliya">{html.escape(exam_breakfasts_raw)}</textarea>
+                    </div>
+                    <button type="submit">Save Exam Schedule</button>
+                </form>
+            </div>
+
+            <div class="card">
+                <h3>App Update (GitHub APK)</h3>
+                <p>After you upload a new APK to GitHub Releases, set the version here. The app will show “Update available” and open the download link.</p>
+                <form action="/update-app-version" method="post">
+                    <div class="grid">
+                        <div>
+                            <label>Latest Version Name</label>
+                            <input type="text" name="latest_version" value="{html.escape(str(app_update.get('latest_version', '')))}" placeholder="1.1.0" required>
+                        </div>
+                        <div>
+                            <label>Latest Build Number</label>
+                            <input type="number" name="latest_build" value="{html.escape(str(app_update.get('latest_build', 1)))}" min="1" required>
+                        </div>
+                    </div>
+                    <div style="margin-top:14px;">
+                        <label>APK Download URL</label>
+                        <input type="text" name="apk_url" value="{html.escape(str(app_update.get('apk_url', '')))}" placeholder="https://github.com/khanak0509/mess-menu/releases/download/..." required>
+                    </div>
+                    <div style="margin-top:14px;">
+                        <label>Update Message</label>
+                        <textarea name="update_message" placeholder="Exam schedule support and bug fixes">{html.escape(str(app_update.get('message', '')))}</textarea>
+                    </div>
+                    <button type="submit">Publish Update Info</button>
+                </form>
+            </div>
         </div>
     </body>
     </html>
@@ -350,6 +580,13 @@ async def get_app_config():
     return _get_config()
 
 
+@app.get("/app-version")
+async def get_app_version():
+    if not db:
+        raise HTTPException(status_code=500, detail="Database is not initialized.")
+    return _get_config().get("app_update", DEFAULT_CONFIG["app_update"])
+
+
 @app.post("/update-config")
 async def update_config(
     weekday_breakfast: str = Form(...),
@@ -364,28 +601,85 @@ async def update_config(
     if not db:
         raise HTTPException(status_code=500, detail="Database is not initialized.")
 
-    new_config = {
-        "timings": {
-            "weekday_breakfast": weekday_breakfast.strip(),
-            "weekend_breakfast": weekend_breakfast.strip(),
-            "lunch": lunch.strip(),
-            "snacks": snacks.strip(),
-            "dinner": dinner.strip(),
-        },
-        "special_dinner": {
-            "date": special_dinner_date.strip(),
-            "veg_text": special_dinner_veg_text.strip(),
-            "nonveg_text": special_dinner_nonveg_text.strip(),
-        },
-    }
-    db.collection(CONFIG_COLLECTION).document(CONFIG_DOC).set(new_config)
-    return HTMLResponse(
-        content="""
-        <body style="background:#111318;color:white;font-family:sans-serif;text-align:center;padding-top:100px;">
-            <h1 style="font-size:40px;">✅ Updated!</h1>
-            <p style="font-size:18px;color:#ccc;max-width:500px;margin:auto;">App settings were saved. The app will use these timings and special dinner note automatically.</p>
-            <br><br>
-            <a href="/admin" style="background:#6200EE;color:white;padding:14px 28px;border-radius:10px;text-decoration:none;font-weight:bold;transition:0.2s;">← Back to Dashboard</a>
-        </body>
-        """
+    _save_config(
+        {
+            "timings": {
+                "weekday_breakfast": weekday_breakfast.strip(),
+                "weekend_breakfast": weekend_breakfast.strip(),
+                "lunch": lunch.strip(),
+                "snacks": snacks.strip(),
+                "dinner": dinner.strip(),
+            },
+            "special_dinner": {
+                "date": special_dinner_date.strip(),
+                "veg_text": special_dinner_veg_text.strip(),
+                "nonveg_text": special_dinner_nonveg_text.strip(),
+            },
+        }
+    )
+    return _success_html(
+        "Updated!",
+        "App settings were saved. The app will use these timings and special dinner note automatically.",
+    )
+
+
+@app.post("/update-exam-schedule")
+async def update_exam_schedule(
+    exam_start_date: str = Form(default=""),
+    exam_end_date: str = Form(default=""),
+    exam_breakfast_time: str = Form(default=""),
+    exam_note: str = Form(default=""),
+    exam_breakfasts_raw: str = Form(default=""),
+):
+    if not db:
+        raise HTTPException(status_code=500, detail="Database is not initialized.")
+
+    start = exam_start_date.strip()
+    default_year = None
+    if re.match(r"^\d{4}-\d{2}-\d{2}$", start):
+        default_year = int(start[:4])
+
+    breakfasts = _parse_exam_breakfasts(exam_breakfasts_raw, default_year)
+    _save_config(
+        {
+            "exam_schedule": {
+                "start_date": start,
+                "end_date": exam_end_date.strip(),
+                "breakfast_time": exam_breakfast_time.strip(),
+                "note": exam_note.strip(),
+                "breakfasts": breakfasts,
+                "breakfasts_raw": exam_breakfasts_raw.strip(),
+            }
+        }
+    )
+    count = len(breakfasts)
+    return _success_html(
+        "Exam schedule saved!",
+        f"Parsed {count} breakfast day(s). The app will show exam breakfast time/menu for those dates.",
+    )
+
+
+@app.post("/update-app-version")
+async def update_app_version(
+    latest_version: str = Form(...),
+    latest_build: int = Form(...),
+    apk_url: str = Form(...),
+    update_message: str = Form(default=""),
+):
+    if not db:
+        raise HTTPException(status_code=500, detail="Database is not initialized.")
+
+    _save_config(
+        {
+            "app_update": {
+                "latest_version": latest_version.strip(),
+                "latest_build": int(latest_build),
+                "apk_url": apk_url.strip(),
+                "message": update_message.strip(),
+            }
+        }
+    )
+    return _success_html(
+        "Update published!",
+        "Users with an older build will see an update prompt that opens your GitHub APK link.",
     )

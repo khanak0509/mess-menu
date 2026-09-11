@@ -92,12 +92,45 @@ class NotificationService {
             'dinner': '19:30-22:30',
           };
 
+    final examNode = (configNode is Map<String, dynamic>)
+        ? configNode['exam_schedule']
+        : null;
+    final examBreakfastTime = (examNode is Map && examNode['breakfast_time'] != null)
+        ? examNode['breakfast_time'].toString().trim()
+        : '';
+    final examBreakfasts = <String, String>{};
+    if (examNode is Map && examNode['breakfasts'] is Map) {
+      (examNode['breakfasts'] as Map).forEach((k, v) {
+        final key = k.toString().trim();
+        final value = v.toString().trim();
+        if (key.isNotEmpty && value.isNotEmpty) {
+          examBreakfasts[key] = value;
+        }
+      });
+    }
+    DateTime? examStart;
+    DateTime? examEnd;
+    if (examNode is Map) {
+      examStart = _parseIsoDate((examNode['start_date'] ?? '').toString());
+      examEnd = _parseIsoDate((examNode['end_date'] ?? '').toString());
+    }
+
     for (int i = 0; i < 7; i++) {
       final targetDate = DateTime.now().add(Duration(days: i));
       final dayName = _getDayName(targetDate.weekday);
       final isWeekend =
           targetDate.weekday == DateTime.saturday ||
           targetDate.weekday == DateTime.sunday;
+      final dateKey =
+          '${targetDate.year}-${targetDate.month.toString().padLeft(2, '0')}-${targetDate.day.toString().padLeft(2, '0')}';
+      final inExamRange =
+          examBreakfasts.containsKey(dateKey) &&
+          (examStart == null ||
+              !DateTime(targetDate.year, targetDate.month, targetDate.day)
+                  .isBefore(examStart)) &&
+          (examEnd == null ||
+              !DateTime(targetDate.year, targetDate.month, targetDate.day)
+                  .isAfter(examEnd));
 
       final dayMenu = fullMenu[dayName] ?? fullMenu[dayName.toLowerCase()];
       if (dayMenu == null) continue;
@@ -106,11 +139,16 @@ class NotificationService {
       dayMenu.forEach((k, v) => cMenu[k.toString().toLowerCase()] = v);
 
       if (cMenu.containsKey('breakfast')) {
-        final main = cMenu['breakfast']['Main'] ?? "Check the app for details!";
-        final time = _getReminderTime(
-          (timings[isWeekend ? 'weekend_breakfast' : 'weekday_breakfast'] ?? '')
-              .toString(),
-        );
+        final examItem = inExamRange ? examBreakfasts[dateKey] : null;
+        final main = (examItem != null && examItem.isNotEmpty)
+            ? examItem
+            : (cMenu['breakfast']['Main'] ?? "Check the app for details!");
+        final breakfastRange = (inExamRange && examBreakfastTime.contains('-'))
+            ? examBreakfastTime
+            : (timings[isWeekend ? 'weekend_breakfast' : 'weekday_breakfast'] ??
+                    '')
+                .toString();
+        final time = _getReminderTime(breakfastRange);
         if (time != null) {
           _scheduleNotification(
             targetDate,
@@ -237,5 +275,15 @@ class NotificationService {
       default:
         return '';
     }
+  }
+
+  DateTime? _parseIsoDate(String value) {
+    final parts = value.trim().split('-');
+    if (parts.length != 3) return null;
+    final y = int.tryParse(parts[0]);
+    final m = int.tryParse(parts[1]);
+    final d = int.tryParse(parts[2]);
+    if (y == null || m == null || d == null) return null;
+    return DateTime(y, m, d);
   }
 }

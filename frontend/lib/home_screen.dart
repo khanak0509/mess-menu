@@ -2,8 +2,10 @@ import 'dart:convert';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shimmer/shimmer.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'meal_card.dart';
 import 'qr_pass_button.dart';
 
@@ -16,6 +18,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   static const String _apiBaseUrl = 'https://mess-menu-v458.onrender.com';
+  static const String _githubRepoUrl = 'https://github.com/khanak0509/mess-menu';
   final List<String> days = const [
     'Monday',
     'Tuesday',
@@ -40,11 +43,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Map<String, dynamic>? _fullMenu;
   bool _isLoading = true;
   bool _didInitialDayScrollAfterLoad = false;
+  bool _didCheckForUpdate = false;
   String _errorMessage = '';
   String _dietPreference = 'veg';
   String _specialDinnerDate = '';
   String _specialDinnerVegText = '';
   String _specialDinnerNonVegText = '';
+  String _examStartDate = '';
+  String _examEndDate = '';
+  String _examBreakfastTime = '';
+  String _examNote = '';
+  Map<String, String> _examBreakfasts = {};
+  Map<String, dynamic>? _pendingAppUpdate;
   Map<String, String> _mealTimings = {
     'weekday_breakfast': '07:30-10:00',
     'weekend_breakfast': '08:00-10:30',
@@ -188,6 +198,81 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     await _fetchMenuFromApi();
   }
 
+  DateTime? _parseIsoDate(String value) {
+    final parts = value.trim().split('-');
+    if (parts.length != 3) return null;
+    final y = int.tryParse(parts[0]);
+    final m = int.tryParse(parts[1]);
+    final d = int.tryParse(parts[2]);
+    if (y == null || m == null || d == null) return null;
+    return DateTime(y, m, d);
+  }
+
+  String _isoFromDate(DateTime date) {
+    final m = date.month.toString().padLeft(2, '0');
+    final d = date.day.toString().padLeft(2, '0');
+    return '${date.year}-$m-$d';
+  }
+
+  /// Best matching exam date for a weekday name (prefers today/upcoming).
+  DateTime? _examDateForDayName(String dayName) {
+    if (_examBreakfasts.isEmpty) return null;
+    final dayIndex = days.indexOf(dayName);
+    if (dayIndex < 0) return null;
+
+    final start = _parseIsoDate(_examStartDate);
+    final end = _parseIsoDate(_examEndDate);
+    final today = DateTime.now();
+    final todayOnly = DateTime(today.year, today.month, today.day);
+
+    DateTime? best;
+    var bestScore = 1 << 30;
+
+    for (final entry in _examBreakfasts.entries) {
+      final date = _parseIsoDate(entry.key);
+      if (date == null) continue;
+      if (date.weekday - 1 != dayIndex) continue;
+      if (start != null && date.isBefore(start)) continue;
+      if (end != null && date.isAfter(end)) continue;
+
+      final score = date.difference(todayOnly).inDays.abs();
+      final adjusted = date.isBefore(todayOnly) ? score + 1000 : score;
+      if (adjusted < bestScore) {
+        bestScore = adjusted;
+        best = date;
+      }
+    }
+    return best;
+  }
+
+  String? _examBreakfastForDay(String dayName) {
+    final date = _examDateForDayName(dayName);
+    if (date == null) return null;
+    return _examBreakfasts[_isoFromDate(date)];
+  }
+
+  bool _selectedDayHasExamBreakfast() {
+    final item = _examBreakfastForDay(_selectedDay);
+    return item != null && item.trim().isNotEmpty;
+  }
+
+  Map<String, dynamic> _mealDetailsForDisplay(
+    String meal,
+    Map<String, dynamic> cMenu,
+  ) {
+    final raw = cMenu[meal];
+    final details = raw is Map
+        ? Map<String, dynamic>.from(raw)
+        : <String, dynamic>{};
+    if (meal == 'breakfast') {
+      final examItem = _examBreakfastForDay(_selectedDay);
+      if (examItem != null && examItem.trim().isNotEmpty) {
+        details['Main'] = examItem.trim();
+      }
+    }
+    return details;
+  }
+
   void _applyMenuPayload(Map<String, dynamic> payload) {
     final rawMenu = payload['menu'];
     final menu = (rawMenu is Map<String, dynamic>) ? rawMenu : payload;
@@ -196,32 +281,56 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (config is Map<String, dynamic>) {
       final timingsRaw = config['timings'];
       final specialRaw = config['special_dinner'];
+      final examRaw = config['exam_schedule'];
+      final updateRaw = config['app_update'];
+
       if (timingsRaw is Map<String, dynamic>) {
-        setState(() {
-          _mealTimings = {
-            ..._mealTimings,
-            ...timingsRaw.map((k, v) => MapEntry(k, v.toString())),
-          };
-        });
+        _mealTimings = {
+          ..._mealTimings,
+          ...timingsRaw.map((k, v) => MapEntry(k, v.toString())),
+        };
       }
       if (specialRaw is Map<String, dynamic>) {
-        setState(() {
-          _specialDinnerDate = (specialRaw['date'] ?? '').toString().trim();
-          _specialDinnerVegText = (specialRaw['veg_text'] ?? '')
-              .toString()
-              .trim();
-          _specialDinnerNonVegText = (specialRaw['nonveg_text'] ?? '')
-              .toString()
-              .trim();
-        });
+        _specialDinnerDate = (specialRaw['date'] ?? '').toString().trim();
+        _specialDinnerVegText =
+            (specialRaw['veg_text'] ?? '').toString().trim();
+        _specialDinnerNonVegText =
+            (specialRaw['nonveg_text'] ?? '').toString().trim();
       } else if (config['special_dinner_text'] != null) {
-        setState(() {
-          _specialDinnerDate = '';
-          _specialDinnerVegText = (config['special_dinner_text'] ?? '')
-              .toString()
-              .trim();
-          _specialDinnerNonVegText = '';
-        });
+        _specialDinnerDate = '';
+        _specialDinnerVegText =
+            (config['special_dinner_text'] ?? '').toString().trim();
+        _specialDinnerNonVegText = '';
+      }
+
+      if (examRaw is Map<String, dynamic>) {
+        _examStartDate = (examRaw['start_date'] ?? '').toString().trim();
+        _examEndDate = (examRaw['end_date'] ?? '').toString().trim();
+        _examBreakfastTime =
+            (examRaw['breakfast_time'] ?? '').toString().trim();
+        _examNote = (examRaw['note'] ?? '').toString().trim();
+        final breakfastsRaw = examRaw['breakfasts'];
+        final parsed = <String, String>{};
+        if (breakfastsRaw is Map) {
+          breakfastsRaw.forEach((k, v) {
+            final key = k.toString().trim();
+            final value = v.toString().trim();
+            if (key.isNotEmpty && value.isNotEmpty) {
+              parsed[key] = value;
+            }
+          });
+        }
+        _examBreakfasts = parsed;
+      } else {
+        _examStartDate = '';
+        _examEndDate = '';
+        _examBreakfastTime = '';
+        _examNote = '';
+        _examBreakfasts = {};
+      }
+
+      if (updateRaw is Map<String, dynamic>) {
+        _pendingAppUpdate = Map<String, dynamic>.from(updateRaw);
       }
     }
 
@@ -233,7 +342,81 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (!_didInitialDayScrollAfterLoad) {
       _didInitialDayScrollAfterLoad = true;
       _scrollToSelectedDay(animate: false);
+    } else {
+      _scrollToSelectedDay(animate: true);
     }
+
+    if (!_didCheckForUpdate) {
+      _didCheckForUpdate = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _maybeShowUpdateDialog();
+      });
+    }
+  }
+
+  Future<void> _maybeShowUpdateDialog() async {
+    final update = _pendingAppUpdate;
+    if (update == null || !mounted) return;
+
+    final remoteBuild = int.tryParse('${update['latest_build']}') ?? 0;
+    final apkUrl = (update['apk_url'] ?? '').toString().trim();
+    if (remoteBuild <= 0 || apkUrl.isEmpty) return;
+
+    final info = await PackageInfo.fromPlatform();
+    final localBuild = int.tryParse(info.buildNumber) ?? 0;
+    if (remoteBuild <= localBuild) return;
+
+    final prefs = await SharedPreferences.getInstance();
+    final dismissed = prefs.getInt('dismissed_update_build') ?? 0;
+    if (dismissed == remoteBuild) return;
+
+    if (!mounted) return;
+    final versionName = (update['latest_version'] ?? '').toString();
+    final message = (update['message'] ?? '').toString().trim();
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Update available'),
+          content: Text(
+            [
+              if (versionName.isNotEmpty) 'Version $versionName is available.',
+              if (message.isNotEmpty) message,
+              'Download the latest APK from GitHub.',
+            ].where((line) => line.isNotEmpty).join('\n\n'),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () async {
+                await prefs.setInt('dismissed_update_build', remoteBuild);
+                if (dialogContext.mounted) {
+                  Navigator.of(dialogContext).pop();
+                }
+              },
+              child: const Text('Later'),
+            ),
+            FilledButton(
+              onPressed: () async {
+                Navigator.of(dialogContext).pop();
+                await _openExternalUrl(apkUrl);
+              },
+              child: const Text('Download'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _openExternalUrl(String url) async {
+    final uri = Uri.tryParse(url);
+    if (uri == null) return;
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
+  Future<void> _openGitHubStar() async {
+    await _openExternalUrl(_githubRepoUrl);
   }
 
   Future<void> _savePreference(String pref) async {
@@ -292,23 +475,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     });
   }
 
-  /*
-  String _getUpNextMealName(Map<String, dynamic> dayMenu) {
-    final now = DateTime.now();
-    final currentHour = now.hour + now.minute / 60.0;
-
-    if (currentHour < 10.0) return "Breakfast";
-    if (currentHour < 14.5) return "Lunch";
-    if (currentHour < 18.0) return "Snacks";
-    if (currentHour < 22.5) return "Dinner";
-    return "Breakfast (Tomorrow)";
-  }
-
-  Widget _buildHeroSection() {
-    return const SizedBox.shrink();
-  }
-  */
-
   bool _isMealActive(String meal, String selectedDay) {
     if (selectedDay != _getCurrentDay()) return false;
     final now = DateTime.now();
@@ -323,6 +489,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   (String, String)? _getRangeForMeal(String meal, bool isWeekend) {
+    if (meal == 'breakfast' &&
+        _selectedDayHasExamBreakfast() &&
+        _examBreakfastTime.contains('-')) {
+      final parts = _examBreakfastTime.split('-');
+      if (parts.length == 2) {
+        return (parts[0].trim(), parts[1].trim());
+      }
+    }
     final key = (meal == 'breakfast' && isWeekend)
         ? 'weekend_breakfast'
         : (meal == 'breakfast' ? 'weekday_breakfast' : meal);
@@ -362,10 +536,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   String _todayIsoDate() {
-    final now = DateTime.now();
-    final m = now.month.toString().padLeft(2, '0');
-    final d = now.day.toString().padLeft(2, '0');
-    return '${now.year}-$m-$d';
+    return _isoFromDate(DateTime.now());
   }
 
   String _getSpecialDinnerForSelectedDay() {
@@ -377,6 +548,35 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         ? _specialDinnerNonVegText
         : _specialDinnerVegText;
     return text.trim();
+  }
+
+  Widget _buildExamBanner() {
+    if (!_selectedDayHasExamBreakfast()) return const SizedBox.shrink();
+    final note = _examNote.trim().isNotEmpty
+        ? _examNote.trim()
+        : 'Exam schedule — breakfast time/menu changed';
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.indigo.withAlpha(28),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: Colors.indigo.withAlpha(90)),
+        ),
+        child: Text(
+          note,
+          style: TextStyle(
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Colors.indigo.shade100
+                : Colors.indigo.shade900,
+            fontSize: 12.5,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _buildDaySelector() {
@@ -479,6 +679,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         title: const Text('IITJ Menu'),
         centerTitle: false,
         actions: [
+          IconButton(
+            tooltip: 'Star on GitHub',
+            onPressed: _openGitHubStar,
+            icon: const Icon(Icons.star_border_rounded),
+          ),
           _buildPreferenceToggle(),
           const QRPassButton(),
           const SizedBox(width: 8),
@@ -493,6 +698,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 children: [
                   const SizedBox(height: 8),
                   _buildDaySelector(),
+                  _buildExamBanner(),
                   if (_errorMessage.isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
@@ -579,7 +785,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           final String meal = entry.value;
           return MealCard(
             mealName: displayNames[meal]!,
-            mealDetails: cMenu[meal],
+            mealDetails: _mealDetailsForDisplay(meal, cMenu),
             isLast: idx == meals.length - 1,
             timelineColor: colors[meal] ?? Colors.grey,
             timeRange: _getDisplayTimeRange(meal),
