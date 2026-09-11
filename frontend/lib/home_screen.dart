@@ -83,10 +83,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       final today = _getCurrentDay();
+      // Only jump when the calendar day changed — don't yank the strip
+      // while the user is browsing other days.
       if (_selectedDay != today) {
         setState(() => _selectedDay = today);
+        _scrollToSelectedDay(animate: true);
       }
-      _scrollToSelectedDay(animate: true);
     }
   }
 
@@ -343,11 +345,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       _isLoading = false;
     });
 
+    // Center today's chip only on the first successful load.
     if (!_didInitialDayScrollAfterLoad) {
       _didInitialDayScrollAfterLoad = true;
       _scrollToSelectedDay(animate: false);
-    } else {
-      _scrollToSelectedDay(animate: true);
     }
 
     // Re-check on every menu load (refresh / reopen), not only once.
@@ -429,7 +430,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _fetchMenuFromApi() async {
-    setState(() => _isLoading = true);
+    final bool showFullLoader = _fullMenu == null;
+    if (showFullLoader) {
+      setState(() => _isLoading = true);
+    }
     try {
       final url = Uri.parse('$_apiBaseUrl/menu?preference=$_dietPreference');
       final response = await http.get(url);
