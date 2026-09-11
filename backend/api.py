@@ -60,7 +60,20 @@ def _get_menu_doc_name(preference: str) -> str:
 def _clean_cell(cell):
     if pd.isna(cell):
         return ""
-    return str(cell).strip()
+    text = str(cell).strip()
+    if text in {"—", "-", "–", "nan", "NaN", "None"}:
+        return ""
+    return text
+
+
+def _find_column(columns, *candidates):
+    """Match a column by exact name, case-insensitive name, or common aliases."""
+    normalized = {str(col).strip().lower(): col for col in columns}
+    for candidate in candidates:
+        key = candidate.strip().lower()
+        if key in normalized:
+            return normalized[key]
+    return None
 
 
 def _process_csv_to_menu(file_bytes: bytes):
@@ -68,6 +81,24 @@ def _process_csv_to_menu(file_bytes: bytes):
     mess_table.columns = mess_table.columns.str.strip()
     mess_table["Day"] = mess_table["Day"].ffill().str.strip()
     mess_table["Meal"] = mess_table["Meal"].str.strip()
+
+    cols = list(mess_table.columns)
+    main_col = _find_column(cols, "Unnamed: 2", "Main", "MAIN")
+    # Excel exports often leave complimentary header blank -> Unnamed: 4
+    complimentary_col = _find_column(
+        cols,
+        "Complimentary items",
+        "Complimentary",
+        "COMPLIMENTARY ITEMS",
+        "Unnamed: 4",
+    )
+    compulsory_col = _find_column(
+        cols, "COMPULSORY ITEMS", "Compulsory items", "Compulsory"
+    )
+    jain_col = _find_column(cols, "JAIN", "Jain")
+    nonveg_col = _find_column(
+        cols, "NON-VEG", "NON VEG", "Non-Veg", "Non Veg", "NONVEG"
+    )
 
     beautiful_menu = {}
 
@@ -81,18 +112,16 @@ def _process_csv_to_menu(file_bytes: bytes):
         if current_day not in beautiful_menu:
             beautiful_menu[current_day] = {}
 
-        nonveg_value = ""
-        for candidate in ["NON-VEG", "NON VEG", "Non-Veg", "Non Veg", "NONVEG"]:
-            if candidate in mess_table.columns:
-                nonveg_value = _clean_cell(meal_row[candidate])
-                break
-
         beautiful_menu[current_day][current_meal] = {
-            "Main": _clean_cell(meal_row["Unnamed: 2"]) if "Unnamed: 2" in mess_table.columns else "",
-            "Complimentary": _clean_cell(meal_row["Complimentary items"]) if "Complimentary items" in mess_table.columns else "",
-            "Compulsory": _clean_cell(meal_row["COMPULSORY ITEMS"]) if "COMPULSORY ITEMS" in mess_table.columns else "",
-            "Jain": _clean_cell(meal_row["JAIN"]) if "JAIN" in mess_table.columns else "",
-            "NonVeg": nonveg_value,
+            "Main": _clean_cell(meal_row[main_col]) if main_col else "",
+            "Complimentary": _clean_cell(meal_row[complimentary_col])
+            if complimentary_col
+            else "",
+            "Compulsory": _clean_cell(meal_row[compulsory_col])
+            if compulsory_col
+            else "",
+            "Jain": _clean_cell(meal_row[jain_col]) if jain_col else "",
+            "NonVeg": _clean_cell(meal_row[nonveg_col]) if nonveg_col else "",
         }
 
     return beautiful_menu
