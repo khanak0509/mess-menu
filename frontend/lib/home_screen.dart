@@ -43,7 +43,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Map<String, dynamic>? _fullMenu;
   bool _isLoading = true;
   bool _didInitialDayScrollAfterLoad = false;
-  bool _didCheckForUpdate = false;
+  int? _sessionDismissedUpdateBuild;
   String _errorMessage = '';
   String _dietPreference = 'veg';
   String _specialDinnerDate = '';
@@ -331,6 +331,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
       if (updateRaw is Map<String, dynamic>) {
         _pendingAppUpdate = Map<String, dynamic>.from(updateRaw);
+      } else if (updateRaw is Map) {
+        _pendingAppUpdate = updateRaw.map(
+          (k, v) => MapEntry(k.toString(), v),
+        );
       }
     }
 
@@ -346,12 +350,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       _scrollToSelectedDay(animate: true);
     }
 
-    if (!_didCheckForUpdate) {
-      _didCheckForUpdate = true;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _maybeShowUpdateDialog();
-      });
-    }
+    // Re-check on every menu load (refresh / reopen), not only once.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _maybeShowUpdateDialog();
+    });
   }
 
   Future<void> _maybeShowUpdateDialog() async {
@@ -366,9 +368,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final localBuild = int.tryParse(info.buildNumber) ?? 0;
     if (remoteBuild <= localBuild) return;
 
-    final prefs = await SharedPreferences.getInstance();
-    final dismissed = prefs.getInt('dismissed_update_build') ?? 0;
-    if (dismissed == remoteBuild) return;
+    // "Later" only hides for this app session.
+    if (_sessionDismissedUpdateBuild == remoteBuild) return;
 
     if (!mounted) return;
     final versionName = (update['latest_version'] ?? '').toString();
@@ -388,11 +389,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           ),
           actions: [
             TextButton(
-              onPressed: () async {
-                await prefs.setInt('dismissed_update_build', remoteBuild);
-                if (dialogContext.mounted) {
-                  Navigator.of(dialogContext).pop();
-                }
+              onPressed: () {
+                _sessionDismissedUpdateBuild = remoteBuild;
+                Navigator.of(dialogContext).pop();
               },
               child: const Text('Later'),
             ),
