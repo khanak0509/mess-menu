@@ -1,95 +1,18 @@
-# Mess Menu App
+# IITJ Mess Menu
 
-A simple full-stack menu management app with:
+App for IIT Jodhpur students to check the mess menu for the week.
 
-- Flutter mobile app
-- FastAPI backend
-- Web admin dashboard for uploads and settings
+- Veg / Non-Veg toggle
+- Breakfast, lunch, snacks, and dinner with timings
+- Meal reminders
+- Updates when exam breakfast or special dinner changes
 
-## About
+## Download
 
-This app lets users view daily meal menus with a Veg/Non-Veg preference.  
-Admins can upload menu CSV files, manage meal timings, and set special dinner notes.
+1. Open the latest release: [Releases](https://github.com/khanak0509/mess-menu/releases)
+2. Download the APK (e.g. [IITJ.menu](https://github.com/khanak0509/mess-menu/releases/download/v1/IITJ.menu))
+3. Install on Android (allow install from unknown sources if asked)
 
-## Live Links
+## Issues
 
-- APK Download: [app-debug.apk](https://github.com/khanak0509/mess-menu/releases/download/v1/IITJ.menu)
-## Tech Stack
-
-- **Frontend:** Flutter
-- **Backend:** FastAPI, Uvicorn
-- **Database:** Firebase Firestore (via Firebase Admin SDK)
-- **Hosting:** Render
-
-## Key Features
-
-- Separate Veg and Non-Veg menu support
-- First-time preference selection in app
-- Preference toggle in app bar
-- Dashboard-based timing updates
-- Date-based special dinner support
-- Local cache fallback when API is unavailable
-
-## Local Setup
-
-### Backend
-
-```bash
-cd backend
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-python3 -m uvicorn api:app --reload --port 8000
-```
-
-Add Firebase credentials file at:
-
-```text
-backend/admin.json
-```
-
-Admin dashboard:
-
-```text
-http://127.0.0.1:8000/admin
-```
-
-### Frontend
-
-```bash
-cd frontend
-flutter pub get
-flutter run
-```
-
-## Build APK
-
-```bash
-cd frontend
-flutter build apk --release
-```
-
-Generated file:
-
-```text
-frontend/build/app/outputs/flutter-apk/app-release.apk
-```
-
-## Main API Endpoints
-
-- `GET /menu?preference=veg|nonveg`
-- `GET /menu/{day}?preference=veg|nonveg`
-- `GET /config`
-- `POST /upload-csv/veg`
-- `POST /upload-csv/nonveg`
-- `POST /update-config`
-
-## Deployment Notes
-
-For Render backend service:
-
-- Root Directory: `backend`
-- Build Command: `pip install -r requirements.txt`
-- Start Command: `uvicorn api:app --host 0.0.0.0 --port $PORT`
-
-Built for IITJ mess operations with quick updates and student-friendly UX.
+Something wrong or missing? [Open an issue](https://github.com/khanak0509/mess-menu/issues/new) and describe it briefly — we’ll look into it.
